@@ -1,0 +1,24 @@
+# Virtual Environment
+aptvenv/
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data & Logs (Don't upload actual production data to Git)
+production_data_2026/
+storage/
+*.csv
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
