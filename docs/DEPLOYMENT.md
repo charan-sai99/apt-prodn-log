@@ -1,28 +1,29 @@
-# Deploying to Vercel
+# Deploying to Netlify
 
 ## Prerequisites
-- The database migrations are applied and reviewed (see DATABASE.md), and a first admin exists.
-- The GitHub repository contains this project at its root.
+- Database migrations reviewed and applied, and a first admin created (see DATABASE.md). The app runs without them but nobody can sign in.
+- This repository is on GitHub (branch `nextjs-migration`, or `main` once merged).
 
 ## Steps
-1. **vercel.com → Add New → Project → Import** the GitHub repository. The framework is detected as Next.js. Keep the defaults: build `next build`, Node 22.
-2. **Environment Variables** (Production *and* Preview):
-   - `NEXT_PUBLIC_SUPABASE_URL` = `https://<ref>.supabase.co`
+1. **app.netlify.com → Add new site → Import an existing project → GitHub** → choose `charan-sai99/apt-prodn-log`.
+2. **Branch to deploy:** `nextjs-migration` (or `main` after merging). Build settings come from `netlify.toml` (`npm run build`, publish `.next`, Node 22). Netlify's Next.js runtime is applied automatically.
+3. **Environment variables** (Site configuration → Environment variables). Add them for all deploy contexts:
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://<ref>.supabase.co` (the API URL, not the dashboard address)
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_…`
-   - `SUPABASE_SECRET_KEY` = `sb_secret_…` (mark **Sensitive**)
-   - `OPERATOR_LOGIN_DOMAIN` = `operators.apt.internal` (or your choice; keep it stable)
-   - `NEXT_PUBLIC_SITE_URL` = your production URL, e.g. `https://apt-production-log.vercel.app`
-3. **Deploy.** After that, every push to the production branch redeploys, and pull requests get preview URLs.
-4. **Supabase → Authentication → URL Configuration:** set **Site URL** to the production URL. Add `https://<your-domain>/auth/confirm` (and the preview pattern `https://*-<team>.vercel.app/auth/confirm` if you want) to **Redirect URLs**, so password-reset links work.
-5. Optional, in Supabase → Authentication → Providers → Email: switch off **public sign-ups**. Accounts are created by admins only.
+   - `SUPABASE_SECRET_KEY` = `sb_secret_…` (mark it **secret**; scope: Builds + Functions)
+   - `OPERATOR_LOGIN_DOMAIN` = `operators.apt.internal` (keep it stable once operators exist)
+   - `NEXT_PUBLIC_SITE_URL` = the site URL, e.g. `https://apt-production-log.netlify.app`. This is optional because Netlify's `URL` is used as a fallback.
+4. **Deploy site.** After that, every push to the chosen branch redeploys, and pull requests get Deploy Previews.
+5. **Supabase → Authentication → URL Configuration:** set **Site URL** to the Netlify URL. Add `https://<site>.netlify.app/auth/confirm` to **Redirect URLs** so password-reset emails work. Optionally add `https://deploy-preview-*--<site>.netlify.app/auth/confirm` too.
+6. Optional: Supabase → Authentication → Providers → Email → switch off public sign-ups. Accounts are created by admins only.
 
-## Smoke test after deploying
+## Smoke test
 1. Sign in as the admin → **Users**: create a supervisor (with email) and an operator (employee code only).
 2. **Assignments**: assign the operator to VIM1.
-3. On a phone, sign in with the operator's employee code → log one hour → see "Entry saved" and the record in *Recent submissions*. Try submitting the same hour + component again: it must be refused.
-4. As the operator, request a correction → as the supervisor, approve it → check that **Audit log** shows the old and new quantity.
-5. As the supervisor: **Dashboard** shows the record (live). **Records → Excel** downloads the workbook.
-6. Install the PWA on the phone (Add to Home Screen) and reopen it.
+3. On a phone, sign in with the operator's employee code → log one hour → you should see "Entry saved". Submitting the same hour + component again must be refused.
+4. As the operator, request a correction → as the supervisor, approve it → the **Audit log** shows the old and new quantity.
+5. Check that the supervisor **Dashboard** updates live and that **Records → Excel** downloads.
+6. Install the app on the phone (Add to Home Screen).
 
 ## Rolling back
-Vercel → Deployments → choose a previous deployment → **Promote to Production**. Database migrations are additive. To roll them back, restore the backup taken before applying them.
+Netlify → Deploys → choose an earlier deploy → **Publish deploy**. Database migrations are additive. To undo them, restore the backup taken before applying.

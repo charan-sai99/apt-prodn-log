@@ -10,7 +10,7 @@
 | Data migration utility | ✅ Components dry run: 246 ready (235 active, 11 inactive), 0 rejected. Legacy production import tested on files written by the old app's own code |
 | Mobile layout | ✅ Screenshots checked at 390 px (phone), 820 px, 1440 px |
 | GitHub | ⏸ Branch `nextjs-migration` committed locally, delivered as `apt-prodn-log-nextjs-migration.bundle`. Not pushed: this session had no write access to the repo |
-| Vercel | ⏸ Not deployed. Needs the database applied and your Vercel account. Steps in docs/DEPLOYMENT.md |
+| Netlify | ⏸ Not deployed yet — `netlify.toml` added; steps in docs/DEPLOYMENT.md |
 | Live URL | — none yet |
 
 ## Not verified (honest limits)
@@ -25,7 +25,7 @@
 4. Push the branch: in your local clone of apt-prodn-log
    `git fetch <path>/apt-prodn-log-nextjs-migration.bundle nextjs-migration:nextjs-migration && git push -u origin nextjs-migration`
    then open a PR into main.
-5. Import into Vercel and set the env vars (docs/DEPLOYMENT.md). Then run the smoke test listed there.
+5. Import into Netlify and set the env vars (docs/DEPLOYMENT.md), then run the smoke test listed there.
 6. If you have the old `storage/` folder: `npm run import:data -- production --storage <folder>` (dry run), review the report, then `--apply --project-ref <ref>`.
 
 ## Decisions taken (change any of them easily)

@@ -26,6 +26,9 @@ export function isValidSupabaseUrl(url: string): boolean {
 export function getSiteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL;
   if (explicit) return explicit.replace(/\/$/, "");
+  // Netlify sets URL (production) / DEPLOY_PRIME_URL; Vercel sets VERCEL_* (hostname only).
+  const netlify = process.env.URL || process.env.DEPLOY_PRIME_URL;
+  if (netlify) return netlify.replace(/\/$/, "");
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;
   return "http://localhost:3000";

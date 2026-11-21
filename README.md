@@ -4,7 +4,7 @@ Mobile-first hourly production logging for **Axis Plastics Transition** — mach
 
 Replaces the earlier Streamlit app (kept unchanged in [`legacy/streamlit/`](legacy/streamlit)).
 
-**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn-style UI on Radix · Supabase (Postgres, Auth, RLS, Realtime) · Recharts · React Hook Form + Zod · ExcelJS · date-fns · Vercel.
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn-style UI on Radix · Supabase (Postgres, Auth, RLS, Realtime) · Recharts · React Hook Form + Zod · ExcelJS · date-fns · hosted on Netlify.
 
 ---
 
@@ -105,7 +105,7 @@ npm run build
 
 The DB suite builds a throwaway database on a **local** PostgreSQL from `supabase/tests/supabase_stub.sql` plus the real migrations. It refuses non-local hosts. It runs twice: once on a fresh project, and once on a project that already has the Stock Portal schema. CI (`.github/workflows/ci.yml`) runs everything on each push.
 
-## Deploying to Vercel
+## Deploying to Netlify
 
 See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
