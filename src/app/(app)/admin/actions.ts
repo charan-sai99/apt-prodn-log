@@ -192,8 +192,16 @@ export async function setComponentActive(id: string, active: boolean): Promise<A
 }
 
 // ------------------------------------------------------------------ assignments
+/** Supervisors and admins may assign operators to machines. */
+async function requireStaff() {
+  const session = await getSession();
+  if (!session || (session.profile.role !== "admin" && session.profile.role !== "supervisor")) return null;
+  return session;
+}
+const STAFF_DENIED = { ok: false as const, error: "Only supervisors and administrators can do that." };
+
 export async function assignMachine(operatorId: string, machineId: string): Promise<ActionResult> {
-  if (!(await requireAdmin())) return DENIED;
+  if (!(await requireStaff())) return STAFF_DENIED;
   if (!uuid.safeParse(operatorId).success || !uuid.safeParse(machineId).success) return { ok: false, error: "Invalid selection." };
   const supabase = await createClient();
   const { error } = await supabase.from("machine_assignments").insert({ operator_id: operatorId, machine_id: machineId });
@@ -203,7 +211,7 @@ export async function assignMachine(operatorId: string, machineId: string): Prom
 }
 
 export async function unassignMachine(assignmentId: string): Promise<ActionResult> {
-  if (!(await requireAdmin())) return DENIED;
+  if (!(await requireStaff())) return STAFF_DENIED;
   if (!uuid.safeParse(assignmentId).success) return { ok: false, error: "Invalid assignment." };
   const supabase = await createClient();
   const { error } = await supabase.from("machine_assignments").update({ is_active: false }).eq("id", assignmentId);

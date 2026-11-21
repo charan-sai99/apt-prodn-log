@@ -8,7 +8,7 @@ export const metadata = { title: "Machine assignments" };
 export const dynamic = "force-dynamic";
 
 export default async function AssignmentsPage() {
-  await requireRole("admin");
+  await requireRole("supervisor", "admin");
   const supabase = await createClient();
   const [machines, { data: ops }, { data: asg }] = await Promise.all([
     getMachines(supabase),

@@ -30,7 +30,10 @@ If those migrations were applied, the project contains:
 - Revokes anonymous access. Revokes direct writes on production tables. Function execute goes to `authenticated` only.
 - Adds `production_entries` and `correction_requests` to the `supabase_realtime` publication.
 
-All three files are re-runnable, and none of them drops data. They were applied twice in a row, both on an empty database and on one that already had the Stock Portal schema, followed by the 77 DB tests.
+### `20261121000004_supervisor_assignments.sql`
+- Supervisors (as well as admins) may assign and unassign operators to machines. Audited like every other change.
+
+All files are re-runnable, and none of them drops data. They were applied twice in a row, both on an empty database and on one that already had the Stock Portal schema, followed by the 77 DB tests.
 
 ## 3. Points to be aware of
 
@@ -41,7 +44,7 @@ All three files are re-runnable, and none of them drops data. They were applied 
 ## 4. How to apply (after approval)
 
 1. Back up: Supabase Dashboard → Database → Backups. Or `pg_dump`.
-2. SQL editor → paste and run each migration file **in order**. Or with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.
+2. SQL editor → paste and run each migration file **in order** (0001 → 0004). Or with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.
 3. Run `supabase/seed/components_seed.sql`. It adds 246 components: 235 active goods and 11 Zoho service items set inactive.
 4. Check: `select machine_code from machines;` returns 5 rows; `select count(*) from components;` returns 246.
 

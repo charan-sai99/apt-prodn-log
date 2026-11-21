@@ -51,7 +51,9 @@ describe("role-based navigation", () => {
   it("never shows admin or supervisor pages to operators", () => {
     const hrefs = navFor("operator").map((n) => n.href);
     expect(hrefs).toEqual(["/entry", "/history", "/my-corrections"]);
-    expect(navFor("supervisor").some((n) => n.href.startsWith("/admin"))).toBe(false);
+    const sup = navFor("supervisor").map((n) => n.href);
+    expect(sup).toContain("/admin/assignments");
+    expect(sup.filter((h) => h.startsWith("/admin"))).toEqual(["/admin/assignments"]);
     expect(navFor("admin").some((n) => n.href === "/admin/users")).toBe(true);
   });
 });

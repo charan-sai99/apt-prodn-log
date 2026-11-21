@@ -194,7 +194,7 @@ for (const variant of [{ name: "prodlog_test_fresh", withStockPortal: false }, {
     });
 
     describe("master data permissions", () => {
-      it("only admins manage machines, components and assignments", async () => {
+      it("only admins manage machines and components; operators cannot assign machines", async () => {
         await expectDbError(db.as(ids.op1!, "insert into components (component_name) values ('Hack')"), /row-level security|permission denied/);
         await expectDbError(db.as(ids.supervisor!, "insert into machines (machine_code, machine_name) values ('VIM9','x')"), /row-level security|permission denied/);
         await expectDbError(db.as(ids.op1!, "insert into machine_assignments (operator_id, machine_id) values ($1,$2)", [ids.op1, m.VIM2]), /row-level security|permission denied/);
@@ -206,6 +206,17 @@ for (const variant of [{ name: "prodlog_test_fresh", withStockPortal: false }, {
       it("rejects assigning machines to non-operators and duplicate assignments", async () => {
         await expectDbError(db.as(ids.admin!, "insert into machine_assignments (operator_id, machine_id) values ($1,$2)", [ids.supervisor, m.VIM3]), "INVALID_OPERATOR");
         await expectDbError(db.as(ids.admin!, "insert into machine_assignments (operator_id, machine_id) values ($1,$2)", [ids.op1, m.VIM1]), "duplicate key");
+      });
+      it("supervisors can assign and unassign operators, and it is audited", async () => {
+        const [a] = await db.as<{ id: string; assigned_by: string }>(ids.supervisor!, "insert into machine_assignments (operator_id, machine_id) values ($1,$2) returning id, assigned_by", [ids.op2, m.VIM3]);
+        expect(a!.assigned_by).toBe(ids.supervisor);
+        const [u] = await db.as<{ is_active: boolean; unassigned_at: string | null }>(ids.supervisor!, "update machine_assignments set is_active=false where id=$1 returning is_active, unassigned_at", [a!.id]);
+        expect(u!.is_active).toBe(false);
+        expect(u!.unassigned_at).not.toBeNull();
+        const logs = await db.owner<{ changed_by: string; action: string }>("select changed_by, action from production_audit_logs where entity_type='machine_assignments' and entity_id=$1 order by id", [a!.id]);
+        expect(logs).toEqual([{ changed_by: ids.supervisor, action: "insert" }, { changed_by: ids.supervisor, action: "update" }]);
+        await expectDbError(db.as(ids.supervisor!, "insert into machine_assignments (operator_id, machine_id) values ($1,$2)", [ids.supervisor, m.VIM3]), "INVALID_OPERATOR");
+        await expectDbError(db.as(ids.supervisor!, "update machines set machine_name='x' where machine_code='VIM3' returning id").then((r) => { if (r.length === 0) throw new Error("RLS blocked"); }), "RLS blocked");
       });
       it("operators cannot change their own assignments", async () => {
         expect(await db.as(ids.op1!, "update machine_assignments set machine_id=$1 returning id", [m.VIM3])).toHaveLength(0);

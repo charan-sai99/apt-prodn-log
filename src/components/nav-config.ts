@@ -25,11 +25,11 @@ export function navFor(role: Role): NavItem[] {
     { href: "/reports", label: "Reports", icon: "report", mobile: true },
     { href: "/corrections", label: "Corrections", icon: "check", mobile: true },
     { href: "/audit", label: "Audit log", icon: "audit" },
+    { href: "/admin/assignments", label: "Assignments", icon: "link" },
   ];
   if (role === "admin") {
     staff.push(
       { href: "/admin/users", label: "Users", icon: "users" },
-      { href: "/admin/assignments", label: "Assignments", icon: "link" },
       { href: "/admin/machines", label: "Machines", icon: "factory" },
       { href: "/admin/components", label: "Components", icon: "box" },
       { href: "/admin/settings", label: "Shifts & settings", icon: "settings" },
