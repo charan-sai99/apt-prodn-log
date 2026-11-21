@@ -1,41 +1,114 @@
-# APT Production Logging App 2026
+# APT Production Log
 
-A high-efficiency, Streamlit-based production logging system designed for the APT 2026 workflow. This application streamlines the recording of hourly production output across multiple specialized machines, ensuring data integrity and facilitating audit trails.
+Mobile-first hourly production logging for **Axis Plastics Transition** — machine operators submit hourly output from their phones; supervisors and administrators monitor production, review corrections and export reports.
 
-## 📝 Project Overview
-This tool replaces manual logging with a standardized digital interface. It allows operators and supervisors to:
-*   **Log Production**: Record component-specific production quantities in real-time.
-*   **Machine Tracking**: Categorize logs by specific machines (`vim1`, `vim2`, `vim3`, `vim4`, `him`).
-*   **Automated Auditing**: Every entry is timestamped and attributed to both the operator and the person entering the data.
-*   **Data Portability**: Saves records in clean CSV formats and maintains detailed text logs for administrative review.
+Replaces the earlier Streamlit app (kept unchanged in [`legacy/streamlit/`](legacy/streamlit)).
 
-## 🚀 Quick Start
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn-style UI on Radix · Supabase (Postgres, Auth, RLS, Realtime) · Recharts · React Hook Form + Zod · ExcelJS · date-fns · Vercel.
 
-### For Linux / Raspberry Pi
-1. Open a terminal in this folder.
-2. Run the setup script:
-   ```bash
-   chmod +x setup.sh run.sh
-   ./setup.sh
-   ```
-3. Launch the app:
-   ```bash
-   ./run.sh
-   ```
+---
 
-### For Windows
-1. Double-click `setup.bat` to create the virtual environment and install dependencies.
-2. Double-click `run.bat` to launch the application.
+## What it does
 
-## 📂 Project Structure
-- `app.py`: Main application logic.
-- `requirements.txt`: List of Python dependencies.
-- `APT_Production_Master.xlsx`: Master list of components.
-- `aptvenv/`: Local Python virtual environment (auto-generated, ignored by Git).
-- `production_data_2026/`: Local storage for logged entries and audit logs (ignored by Git).
+| Role | Can |
+|---|---|
+| **Operator** | Sign in with employee code · see assigned machine(s) · log hourly production (date, shift, hour, component, quantity) · see today's and past submissions · request corrections (never edit directly) |
+| **Supervisor** | Dashboard for all 5 machines (live) · filter records by date/machine/operator/component/shift/search · daily/weekly/monthly + machine/operator/component reports · CSV & Excel export · approve/reject corrections · audit log · record on behalf of an operator |
+| **Administrator** | Everything above + create/deactivate accounts, set roles, reset operator passwords · assign operators to machines · manage machines, components, shifts and factory settings |
 
-## 🛠 Tech Stack
-- **Python 3**
-- **Streamlit** (UI Framework)
-- **Pandas** (Data Processing)
-- **OpenPyXL** (Excel Support)
+Business rules carried over from the legacy app: production time can't be in the future; quantity is a whole number ≥ 1; every entry records operator **and** who entered it; machines `vim1…vim4, him` → `VIM1…VIM4, HIM`; components come from the master list.
+
+New rules: one active record per machine + date + hour + component (duplicate taps are idempotent); operators can back-date 1 day (admin setting); corrections need supervisor approval; nothing is hard-deleted; every change is in an append-only audit log; factory time zone is **Asia/Kolkata**.
+
+## Security model
+
+- Roles live in `public.profiles` and are read on the server and in the database — **never** taken from the browser.
+- **Row Level Security** on every table. Operators see only their own records and assigned machines. Supervisors read everything. Only admins change master data.
+- **All production writes go through `SECURITY DEFINER` RPCs** (`submit_production_entry`, `request_correction`, `review_correction`, `cancel_correction`). They take the user from `auth.uid()` and validate assignment, quantity, time and duplicates. Direct `INSERT/UPDATE/DELETE` on production tables is revoked for every app user, admins included.
+- Triggers block self-promotion, removing the last admin, re-keying records, hard deletes, and edits to audit rows.
+- The browser only ever has the **publishable** key. The **secret** key is server-only and is used just for Supabase Auth admin calls (create / ban user, set password) after the caller is re-verified as an admin.
+- Sessions live in HTTP cookies (`@supabase/ssr`). Nothing sensitive goes into localStorage. The service worker caches only static assets.
+
+## Project layout
+
+```
+src/app/(auth)/        login, forgot/reset password
+src/app/(app)/entry    operator mobile form        /history  /my-corrections
+src/app/(app)/dashboard /records /reports /corrections /audit   (supervisor + admin)
+src/app/(app)/admin/   users, assignments, machines, components, settings
+src/app/api/export     CSV / Excel export (staff only)
+src/lib/               auth, data access, validation, time zone, aggregation, export
+src/proxy.ts           session refresh + sign-in redirect (Next 16 "proxy")
+supabase/migrations/   version-controlled SQL (review before applying!)
+supabase/seed/         component master seed (246 items from the Excel master)
+supabase/tests/        local-only Supabase stub for DB tests
+scripts/migrate/       legacy data migration utility (dry-run by default)
+tests/unit, tests/db   Vitest suites
+legacy/streamlit/      the original Streamlit app and master Excel, untouched
+```
+
+## Local development
+
+Requires Node.js ≥ 20.9.
+
+```bash
+npm install
+cp .env.example .env.local      # fill in values — see below
+npm run dev                     # http://localhost:3000
+```
+
+### Environment variables
+
+| Name | Where | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | browser + server | **API URL** `https://<ref>.supabase.co` (Project Settings → API). *Not* the `supabase.com/dashboard/...` address. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser + server | `sb_publishable_…` key. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is accepted as a fallback. |
+| `SUPABASE_SECRET_KEY` | **server only** | `sb_secret_…` (or legacy service_role). Needed for account management and the migration utility. Never prefix with `NEXT_PUBLIC_`. |
+| `OPERATOR_LOGIN_DOMAIN` | server | Operators sign in with their employee code. It maps to `<code>@<this domain>` in Supabase Auth. Default `operators.apt.internal`. Set it once, before creating operators. |
+| `NEXT_PUBLIC_SITE_URL` | server | Public URL, used in password-reset emails. |
+
+## Database setup
+
+See **[docs/DATABASE.md](docs/DATABASE.md)** for the schema, the comparison with the existing Stock Portal schema in the same Supabase project, and the exact apply order.
+
+Short version, after reviewing the SQL:
+1. Supabase SQL editor → run the three files in `supabase/migrations/` in order.
+2. Run `supabase/seed/components_seed.sql` (or `npm run import:data -- components --apply …`).
+3. Create the first admin (see docs/DATABASE.md §5). Then do everything else in the app.
+
+## Data migration (legacy CSV / logs)
+
+```bash
+# dry run — reads, validates, writes a report; sends nothing
+npm run import:data -- components --master legacy/streamlit/data/APT_Production_Master.xlsx --items Item.xlsx
+npm run import:data -- production --storage /path/to/legacy/storage
+
+# write (only after reviewing the report)
+npm run import:data -- production --storage /path/to/legacy/storage --apply --project-ref <ref>
+```
+
+- Originals are only read. Each run copies them to `migration-backups/<timestamp>/` with SHA-256 checksums.
+- Imports are idempotent: components are keyed by Zoho Item ID, and legacy rows by a hash of the original row.
+- Unmappable rows block `--apply` and are listed in `migration-reports/<timestamp>/` (`summary.md`, `discrepancies.csv`). This covers unknown components, conflicting quantities, missing log lines and names that look like test data. Nothing is guessed. `--allow-partial` imports only the clean rows.
+- Operator names are recovered from the legacy `.log` files and stored as `legacy_operator_name`. Legacy operators had no accounts.
+
+## Testing
+
+```bash
+npm run typecheck
+npm run lint
+npm test                 # unit tests (validation, time zone, aggregation, exports, migration)
+PG_TEST_URL=postgres://postgres@localhost:5432/postgres npm run test:db
+                         # DB tests: RLS, roles, RPCs, duplicates, corrections, audit, concurrency
+npm run build
+```
+
+The DB suite builds a throwaway database on a **local** PostgreSQL from `supabase/tests/supabase_stub.sql` plus the real migrations. It refuses non-local hosts. It runs twice: once on a fresh project, and once on a project that already has the Stock Portal schema. CI (`.github/workflows/ci.yml`) runs everything on each push.
+
+## Deploying to Vercel
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+## Installing on phones (PWA)
+
+Open the site in Chrome (Android) → menu → **Install app**, or Safari (iPhone) → Share → **Add to Home Screen**. The app needs a network connection to save entries. It deliberately does not queue production records offline on the device.

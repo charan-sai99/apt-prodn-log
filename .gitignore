@@ -1,24 +1,33 @@
-# Virtual Environment
-aptvenv/
-venv/
-.venv/
-env/
+# dependencies
+node_modules/
 
-# Python cache
+# Next.js / Vercel
+.next/
+out/
+build/
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+
+# environment — never commit secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# migration utility output (may contain production data)
+migration-reports/
+migration-backups/
+
+# legacy Streamlit runtime data
+legacy/streamlit/storage/
+legacy/streamlit/aptvenv/
 __pycache__/
 *.py[cod]
-*$py.class
 
-# Data & Logs (Don't upload actual production data to Git)
-production_data_2026/
-storage/
-*.csv
-*.log
-
-# IDEs
-.vscode/
-.idea/
-
-# OS files
+# OS / IDE
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
