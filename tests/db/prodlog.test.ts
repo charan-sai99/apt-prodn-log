@@ -69,6 +69,13 @@ for (const variant of [{ name: "prodlog_test_fresh", withStockPortal: false }, {
         expect(await role(ids.inactive!)).toBeNull();
         expect(await role(ids.customer!)).toBeNull();
       });
+      it("lets every signed-in user read their own profile (used at sign-in)", async () => {
+        for (const u of [ids.admin!, ids.supervisor!, ids.op1!]) {
+          const rows = await db.as<{ role: string; is_active: boolean }>(u, "select role, is_active from profiles where id = $1", [u]);
+          expect(rows).toHaveLength(1);
+        }
+        expect(await db.as(ids.op1!, "select id from profiles where id = $1", [ids.op2])).toHaveLength(0);
+      });
       it("gives anonymous callers no access", async () => {
         await expectDbError(db.as(null, "select * from production_entries"), "permission denied");
         await expectDbError(db.as(null, SUBMIT_SQL, [m.VIM1, c.a, yesterday, 1, 1, randomUUID(), null, null]), "permission denied");

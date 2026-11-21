@@ -149,6 +149,12 @@ grant insert, update on public.shifts, public.machines, public.components,
   to authenticated;
 grant update on public.prodlog_settings to authenticated;
 
+-- Newer Supabase projects do not grant table privileges to `authenticated`
+-- automatically. Signed-in users need to read their own profile (RLS above
+-- limits which rows) and admins need insert/update. Delete is not granted.
+grant select, insert, update on public.profiles to authenticated;
+revoke all on public.profiles from anon;
+
 -- Functions: never callable anonymously.
 do $$
 declare f text;
