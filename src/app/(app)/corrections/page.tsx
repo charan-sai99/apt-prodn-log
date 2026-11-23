@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/data";
+import { pageContext } from "@/lib/auth";
 import { formatHourSlot, formatTimestamp } from "@/lib/time";
 import { str, type SearchParams } from "@/lib/params";
 import { PageHeader } from "@/components/page-header";
@@ -16,9 +14,7 @@ export const metadata = { title: "Corrections" };
 export const dynamic = "force-dynamic";
 
 export default async function CorrectionsPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireRole("supervisor", "admin");
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { supabase, settings } = await pageContext("supervisor", "admin");
   const tab = str((await searchParams).tab) === "history" ? "history" : "pending";
 
   let q = supabase.from("correction_requests").select("*").order("created_at", { ascending: tab === "pending" }).limit(300);

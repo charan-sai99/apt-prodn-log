@@ -1,7 +1,6 @@
 import { Download, FileSpreadsheet } from "lucide-react";
-import { requireRole } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { fetchEntries, getSettings } from "@/lib/data";
+import { pageContext } from "@/lib/auth";
+import { fetchEntries } from "@/lib/data";
 import { summarize, type Bucket } from "@/lib/aggregate";
 import { datesBetween, factoryNow, formatDisplayDate, isValidIsoDate, periodRange, type ReportPeriod } from "@/lib/time";
 import { parseRecordFilters, filtersToQuery } from "@/lib/filters";
@@ -43,9 +42,7 @@ function BucketTable({ title, buckets, total, nameHeader }: { title: string; buc
 }
 
 export default async function ReportsPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireRole("supervisor", "admin");
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { supabase, settings } = await pageContext("supervisor", "admin");
   const today = factoryNow(settings.timezone).date;
   const sp = await searchParams;
   const period = (["daily", "weekly", "monthly"].includes(str(sp.period) ?? "") ? str(sp.period) : "daily") as ReportPeriod;

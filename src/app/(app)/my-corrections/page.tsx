@@ -1,6 +1,4 @@
-import { requireSession } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/data";
+import { pageContext } from "@/lib/auth";
 import { formatHourSlot, formatTimestamp } from "@/lib/time";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -13,9 +11,7 @@ export const metadata = { title: "My corrections" };
 export const dynamic = "force-dynamic";
 
 export default async function MyCorrectionsPage() {
-  const { userId } = await requireSession();
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { session: { userId }, supabase, settings } = await pageContext();
   const { data } = await supabase
     .from("correction_requests")
     .select("*")

@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/data";
+import { pageContext } from "@/lib/auth";
 import { formatTimestamp } from "@/lib/time";
 import { str, type SearchParams } from "@/lib/params";
 import { PageHeader } from "@/components/page-header";
@@ -27,9 +25,7 @@ function diff(oldV: Record<string, unknown> | null, newV: Record<string, unknown
 const show = (v: unknown) => (v === null || v === undefined ? "∅" : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 export default async function AuditPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireRole("supervisor", "admin");
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { supabase, settings } = await pageContext("supervisor", "admin");
   const sp = await searchParams;
   const entity = ENTITIES.includes(str(sp.entity) ?? "") ? str(sp.entity) : undefined;
   const page = Math.max(1, Number.parseInt(str(sp.page) ?? "1", 10) || 1);

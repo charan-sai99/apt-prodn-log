@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Download, FileSpreadsheet } from "lucide-react";
-import { requireRole } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { fetchEntries, getSettings } from "@/lib/data";
+import { pageContext } from "@/lib/auth";
+import { fetchEntries } from "@/lib/data";
 import { summarize } from "@/lib/aggregate";
 import { factoryNow, formatHourSlot, formatTimestamp } from "@/lib/time";
 import { parseRecordFilters, filtersToQuery } from "@/lib/filters";
@@ -23,9 +22,7 @@ export const dynamic = "force-dynamic";
 const PAGE = 100;
 
 export default async function RecordsPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireRole("supervisor", "admin");
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { supabase, settings } = await pageContext("supervisor", "admin");
   const today = factoryNow(settings.timezone).date;
   const sp = await searchParams;
   const filters = parseRecordFilters(sp, { from: today, to: today });

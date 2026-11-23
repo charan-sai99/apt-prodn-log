@@ -12,40 +12,16 @@ export const metadata: Metadata = { title: "Log production" };
 export const dynamic = "force-dynamic";
 
 export default async function EntryPage() {
-  const { profile, userId } = await requireSession();
   const supabase = await createClient();
-  const isOperator = profile.role === "operator";
-
-  const [settings, shifts, components] = await Promise.all([
+  // Two parallel rounds instead of four sequential ones (each round crosses
+  // from the server to the database, so this is most of the page's time).
+  const [{ profile, userId }, settings, shifts, components] = await Promise.all([
+    requireSession(),
     getSettings(supabase),
     getShifts(supabase),
     getComponents(supabase),
   ]);
-
-  // Machines available to this user, plus (for staff) operators to record for.
-  let machines: Machine[] = [];
-  let operators: { id: string; display_name: string; employee_code: string | null; machineIds: string[] }[] = [];
-  if (isOperator) {
-    const { data } = await supabase
-      .from("machine_assignments")
-      .select("machine:machines(*)")
-      .eq("operator_id", userId)
-      .eq("is_active", true);
-    machines = ((data ?? []) as unknown as { machine: Machine | null }[])
-      .map((r) => r.machine)
-      .filter((m): m is Machine => Boolean(m?.is_active))
-      .sort((a, b) => a.sort_order - b.sort_order);
-  } else {
-    machines = await getMachines(supabase);
-    const [{ data: ops }, { data: asg }] = await Promise.all([
-      supabase.from("profiles").select("id, display_name, employee_code").eq("role", "operator").eq("is_active", true).order("display_name"),
-      supabase.from("machine_assignments").select("operator_id, machine_id").eq("is_active", true),
-    ]);
-    operators = (ops ?? []).map((o) => ({
-      ...(o as { id: string; display_name: string; employee_code: string | null }),
-      machineIds: (asg ?? []).filter((a) => a.operator_id === o.id).map((a) => a.machine_id as string),
-    }));
-  }
+  const isOperator = profile.role === "operator";
 
   const now = factoryNow(settings.timezone);
   const allowedDates = isOperator
@@ -61,7 +37,38 @@ export default async function EntryPage() {
     .order("created_at", { ascending: false })
     .limit(300);
   recentQuery = isOperator ? recentQuery.eq("operator_id", userId) : recentQuery.eq("entered_by", userId);
-  const [{ data: recent }, { data: pending }] = await Promise.all([
+
+  // Machines available to this user, plus (for staff) operators to record for.
+  const loadMachines = async (): Promise<{
+    machines: Machine[];
+    operators: { id: string; display_name: string; employee_code: string | null; machineIds: string[] }[];
+  }> => {
+    if (isOperator) {
+      const { data } = await supabase
+        .from("machine_assignments")
+        .select("machine:machines(*)")
+        .eq("operator_id", userId)
+        .eq("is_active", true);
+      const machines = ((data ?? []) as unknown as { machine: Machine | null }[])
+        .map((r) => r.machine)
+        .filter((m): m is Machine => Boolean(m?.is_active))
+        .sort((a, b) => a.sort_order - b.sort_order);
+      return { machines, operators: [] };
+    }
+    const [machines, { data: ops }, { data: asg }] = await Promise.all([
+      getMachines(supabase),
+      supabase.from("profiles").select("id, display_name, employee_code").eq("role", "operator").eq("is_active", true).order("display_name"),
+      supabase.from("machine_assignments").select("operator_id, machine_id").eq("is_active", true),
+    ]);
+    const operators = (ops ?? []).map((o) => ({
+      ...(o as { id: string; display_name: string; employee_code: string | null }),
+      machineIds: (asg ?? []).filter((a) => a.operator_id === o.id).map((a) => a.machine_id as string),
+    }));
+    return { machines, operators };
+  };
+
+  const [{ machines, operators }, { data: recent }, { data: pending }] = await Promise.all([
+    loadMachines(),
     recentQuery,
     supabase.from("correction_requests").select("*").eq("requested_by", userId).eq("status", "pending"),
   ]);

@@ -1,9 +1,10 @@
 "use client";
-import Link from "next/link";
+import { useState } from "react";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Boxes, ClipboardCheck, Factory, FileSpreadsheet, History, LayoutDashboard, Link2,
-  LogOut, Menu, PlusCircle, ScrollText, Settings, Table2, Users, Wrench,
+  Loader2, LogOut, Menu, PlusCircle, ScrollText, Settings, Table2, Users, Wrench,
 } from "lucide-react";
 import type { NavItem, IconName } from "./nav-config";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,13 @@ const ICONS: Record<IconName, React.ComponentType<{ className?: string }>> = {
   report: FileSpreadsheet, check: ClipboardCheck, audit: ScrollText, users: Users, factory: Factory,
   box: Boxes, link: Link2, settings: Settings,
 };
+
+/** Swaps the icon for a spinner while the tapped page is loading. */
+function NavIcon({ icon, className }: { icon: IconName; className: string }) {
+  const { pending } = useLinkStatus();
+  const Icon = ICONS[icon];
+  return pending ? <Loader2 className={cn(className, "animate-spin")} aria-hidden /> : <Icon className={className} />;
+}
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -36,7 +44,6 @@ export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="Main">
         {items.map((item) => {
-          const Icon = ICONS[item.icon];
           const active = isActive(pathname, item.href);
           return (
             <Link
@@ -48,7 +55,7 @@ export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
                 active ? "bg-brand text-white" : "hover:bg-white/5 hover:text-white",
               )}
             >
-              <Icon className="size-4" />
+              <NavIcon icon={item.icon} className="size-4" />
               {item.label}
             </Link>
           );
@@ -69,7 +76,13 @@ export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
 
 export function MobileNav({ items, userName, roleLabel, signOut }: Props) {
   const pathname = usePathname();
+  // The sheet belongs to the page it was opened on, so it closes by itself
+  // as soon as navigation lands on a new page.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const menuOpen = openOn === pathname;
+  const setMenuOpen = (open: boolean) => setOpenOn(open ? pathname : null);
   const primary = items.filter((i) => i.mobile).slice(0, 4);
+
   return (
     <nav
       aria-label="Main"
@@ -77,7 +90,6 @@ export function MobileNav({ items, userName, roleLabel, signOut }: Props) {
     >
       <ul className="mx-auto flex max-w-lg">
         {primary.map((item) => {
-          const Icon = ICONS[item.icon];
           const active = isActive(pathname, item.href);
           return (
             <li key={item.href} className="flex-1">
@@ -85,44 +97,52 @@ export function MobileNav({ items, userName, roleLabel, signOut }: Props) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold",
+                  "relative flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold active:bg-slate-100",
                   active ? "text-brand" : "text-muted",
                 )}
               >
-                <Icon className="size-6" />
+                {active && <span className="absolute inset-x-5 top-0 h-1 rounded-b-full bg-brand" aria-hidden />}
+                <NavIcon icon={item.icon} className="size-6" />
                 {item.label}
               </Link>
             </li>
           );
         })}
-          <li className="flex-1">
-            <Dialog>
-              <DialogTrigger className="flex min-h-16 w-full flex-col items-center justify-center gap-1 text-[11px] font-semibold text-muted">
-                <Menu className="size-6" /> Menu
-              </DialogTrigger>
-              <DialogContent title={userName} description={roleLabel}>
-                <ul className="space-y-1">
-                  {items.map((item) => {
-                    const Icon = ICONS[item.icon];
-                    return (
-                      <li key={item.href}>
-                        <Link href={item.href} className="flex items-center gap-3 rounded-lg px-3 py-3 font-medium hover:bg-slate-100">
-                          <Icon className="size-5 text-muted" /> {item.label}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <form action={signOut} className="mt-4 border-t border-line pt-4">
-                  <button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 font-medium text-danger hover:bg-danger-50">
-                    <LogOut className="size-5" /> Sign out
-                  </button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </li>
+        <li className="flex-1">
+          <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
+            <DialogTrigger className="flex min-h-16 w-full flex-col items-center justify-center gap-1 text-[11px] font-semibold text-muted active:bg-slate-100">
+              <Menu className="size-6" /> Menu
+            </DialogTrigger>
+            <DialogContent title={userName} description={roleLabel}>
+              <ul className="space-y-1">
+                {items.map((item) => {
+                  const active = isActive(pathname, item.href);
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setMenuOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-3 font-medium",
+                          active ? "bg-brand-50 text-brand" : "hover:bg-slate-100 active:bg-slate-100",
+                        )}
+                      >
+                        <NavIcon icon={item.icon} className="size-5 text-muted" /> {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              <form action={signOut} className="mt-4 border-t border-line pt-4">
+                <button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 font-medium text-danger hover:bg-danger-50">
+                  <LogOut className="size-5" /> Sign out
+                </button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </li>
       </ul>
     </nav>
   );
 }
-

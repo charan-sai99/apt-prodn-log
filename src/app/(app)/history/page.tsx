@@ -1,6 +1,5 @@
-import { requireRole } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { fetchEntries, getSettings } from "@/lib/data";
+import { pageContext } from "@/lib/auth";
+import { fetchEntries } from "@/lib/data";
 import { factoryNow, formatDisplayDate, formatHourSlot, lastNDays } from "@/lib/time";
 import { dateRangeParam, type SearchParams } from "@/lib/params";
 import { PageHeader } from "@/components/page-header";
@@ -14,9 +13,7 @@ export const metadata = { title: "My history" };
 export const dynamic = "force-dynamic";
 
 export default async function HistoryPage({ searchParams }: { searchParams: SearchParams }) {
-  const { userId } = await requireRole("operator");
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { session: { userId }, supabase, settings } = await pageContext("operator");
   const today = factoryNow(settings.timezone).date;
   const { from, to } = dateRangeParam(await searchParams, lastNDays(14, today));
   const { rows, truncated, error } = await fetchEntries(supabase, { from, to, status: "all", operatorSelf: userId }, 3000);

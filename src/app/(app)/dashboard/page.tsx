@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Activity, Boxes, Clock, Factory, Users } from "lucide-react";
-import { requireRole } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { fetchEntries, getMachines, getSettings } from "@/lib/data";
+import { pageContext } from "@/lib/auth";
+import { fetchEntries, getMachines } from "@/lib/data";
 import { summarize } from "@/lib/aggregate";
 import { datesBetween, factoryNow, formatDisplayDate, formatHourSlot, isValidIsoDate, lastNDays } from "@/lib/time";
 import { str, type SearchParams } from "@/lib/params";
@@ -21,9 +20,7 @@ export const metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireRole("supervisor", "admin");
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { supabase, settings } = await pageContext("supervisor", "admin");
   const now = factoryNow(settings.timezone);
   const sp = await searchParams;
   const dateParam = str(sp.date);
