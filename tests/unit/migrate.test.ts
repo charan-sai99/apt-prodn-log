@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { componentsSeedSql, importKey, mapComponents, mapProduction, parseCsv, parseLogLines, readLegacyCsv, type ComponentLookup } from "../../scripts/migrate/core";
+import { componentsSeedSql, importKey, mapComponents, mapProduction, mapProductionList, parseCsv, parseLogLines, productionListSql, readLegacyCsv, type ComponentLookup } from "../../scripts/migrate/core";
 
 describe("component master mapping", () => {
   const master = [
@@ -86,5 +86,38 @@ describe("legacy production mapping", () => {
     const backup = /Backup:\s+(\S+)/.exec(out)![1]!;
     const manifest = JSON.parse(readFileSync(path.join(backup, "manifest.json"), "utf8")) as unknown[];
     expect(manifest.length).toBe(7);
+  }, 60000);
+});
+
+describe("production component list (independent of Zoho)", () => {
+  const rows = [
+    { row: 2, name: "STAR LEAF 021", rawMaterial: "PC ORANGE" },
+    { row: 3, name: "STAR LEAF 038 ", rawMaterial: " PC  RED " },
+    { row: 4, name: null, rawMaterial: null },
+    { row: 5, name: "star leaf 021", rawMaterial: "PC ORANGE" },
+    { row: 6, name: "SPACER 2MM", rawMaterial: null },
+  ];
+  const r = mapProductionList(rows);
+  it("trims names and materials, skips blank rows and rejects duplicates", () => {
+    expect(r.records).toEqual([
+      { component_name: "STAR LEAF 021", raw_material: "PC ORANGE" },
+      { component_name: "STAR LEAF 038", raw_material: "PC RED" },
+      { component_name: "SPACER 2MM", raw_material: null },
+    ]);
+    expect(r.issues.map((i) => i.code).sort()).toEqual(["BLANK_ROWS_SKIPPED", "DUPLICATE_NAME", "MISSING_RAW_MATERIAL"]);
+  });
+  it("generates SQL that upserts by name and hides other components", () => {
+    const sql = productionListSql(r.records);
+    expect(sql).toContain("('STAR LEAF 021', 'PC ORANGE', true)");
+    expect(sql).toContain("on conflict ((lower(btrim(component_name))))");
+    expect(sql).toContain("set is_active = false");
+    expect(sql).not.toMatch(/\bdelete\b/i);
+    expect(productionListSql(r.records, { keepOthers: true })).not.toContain("set is_active = false");
+  });
+  it("reads the real APT production list workbook", () => {
+    const tmp = mkdtempSync(path.join(tmpdir(), "plist-"));
+    const out = execFileSync("npx", ["tsx", path.resolve("scripts/migrate/index.ts"), "production-list", "--file", path.resolve("tests/fixtures/APT_ProdnList.xlsx"), "--env", "/nonexistent"], { cwd: tmp, encoding: "utf8" });
+    expect(out).toContain("Production components ready: 24");
+    expect(out).toContain("rejected: 0");
   }, 60000);
 });

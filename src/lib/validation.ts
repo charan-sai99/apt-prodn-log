@@ -97,6 +97,7 @@ export const componentSchema = z.object({
     .optional()
     .nullable(),
   description: z.string().trim().max(500).optional().nullable(),
+  rawMaterial: z.string().trim().max(80, "Keep it under 80 characters").optional().nullable(),
 });
 
 export const shiftSchema = z.object({

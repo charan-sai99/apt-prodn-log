@@ -92,7 +92,7 @@ export default async function EntryPage() {
         isOperator={isOperator}
         machines={machines.map((m) => ({ id: m.id, code: m.machine_code, name: m.machine_name }))}
         operators={operators}
-        components={components.map((c) => ({ id: c.id, component_name: c.component_name, component_code: c.component_code }))}
+        components={components.map((c) => ({ id: c.id, component_name: c.component_name, component_code: c.component_code, raw_material: c.raw_material }))}
         shifts={shifts}
         allowedDates={allowedDates}
         timezone={settings.timezone}

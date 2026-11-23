@@ -17,11 +17,11 @@ export function ComponentsManager({ components }: { components: Component[] }) {
   const [limit, setLimit] = useState(100);
   const shown = useMemo(() => components.filter((c) =>
     (status === "all" || (status === "active") === c.is_active) &&
-    `${c.component_name} ${c.component_code ?? ""} ${c.zoho_item_id ?? ""}`.toLowerCase().includes(q.toLowerCase())), [components, q, status]);
+    `${c.component_name} ${c.raw_material ?? ""} ${c.component_code ?? ""} ${c.zoho_item_id ?? ""}`.toLowerCase().includes(q.toLowerCase())), [components, q, status]);
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 p-4">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, part code, Zoho ID" className="max-w-sm" aria-label="Search components" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, material, part code" className="max-w-sm" aria-label="Search components" />
         <NativeSelect value={status} onChange={(e) => setStatus(e.target.value)} className="w-36" aria-label="Status">
           <option value="active">Active</option><option value="inactive">Inactive</option><option value="all">All</option>
         </NativeSelect>
@@ -29,7 +29,7 @@ export function ComponentsManager({ components }: { components: Component[] }) {
         <div className="ml-auto"><ComponentDialog /></div>
       </div>
       <Table>
-        <THead><tr><TH>Component</TH><TH>Part code</TH><TH>Zoho Item ID</TH><TH>Type</TH><TH>Status</TH><TH className="text-right">Actions</TH></tr></THead>
+        <THead><tr><TH>Component</TH><TH>Raw material</TH><TH>Part code</TH><TH>Zoho Item ID</TH><TH>Status</TH><TH className="text-right">Actions</TH></tr></THead>
         <tbody>
           {shown.length === 0 && <EmptyRow colSpan={6}>No components match.</EmptyRow>}
           {shown.slice(0, limit).map((c) => <Row key={c.id} c={c} />)}
@@ -45,9 +45,9 @@ function Row({ c }: { c: Component }) {
   return (
     <tr className={c.is_active ? undefined : "text-slate-400"}>
       <TD className="min-w-64 font-medium">{c.component_name}</TD>
+      <TD className="whitespace-nowrap text-xs font-semibold">{c.raw_material ?? "—"}</TD>
       <TD className="max-w-48 whitespace-pre-line text-xs">{c.component_code ?? "—"}</TD>
       <TD className="font-mono text-xs">{c.zoho_item_id ?? "—"}</TD>
-      <TD className="text-xs">{c.product_type ?? "—"}</TD>
       <TD>{c.is_active ? <Badge variant="success">Active</Badge> : <Badge>Inactive</Badge>}</TD>
       <TD className="text-right"><div className="flex justify-end gap-1">
         <ComponentDialog c={c} />
@@ -71,8 +71,9 @@ function ComponentDialog({ c }: { c?: Component }) {
           run(() => saveComponent({ ...Object.fromEntries(new FormData(e.currentTarget)), id: c?.id }), () => setOpen(false));
         }}>
           <div className="space-y-1"><Label htmlFor="cn">Name</Label><Input id="cn" name="componentName" defaultValue={c?.component_name} required /><FieldError message={fieldErrors.componentName} /></div>
+          <div className="space-y-1"><Label htmlFor="crm">Raw material</Label><Input id="crm" name="rawMaterial" defaultValue={c?.raw_material ?? ""} placeholder="e.g. PC BLACK" /><FieldError message={fieldErrors.rawMaterial} /></div>
           <div className="space-y-1"><Label htmlFor="cc">Part code</Label><Input id="cc" name="componentCode" defaultValue={c?.component_code ?? ""} placeholder="e.g. COM-SPA-00018" /></div>
-          <div className="space-y-1"><Label htmlFor="cz">Zoho Item ID</Label><Input id="cz" name="zohoItemId" defaultValue={c?.zoho_item_id ?? ""} inputMode="numeric" /><FieldError message={fieldErrors.zohoItemId} /></div>
+          <div className="space-y-1"><Label htmlFor="cz">Zoho Item ID <span className="font-normal text-muted">(optional)</span></Label><Input id="cz" name="zohoItemId" defaultValue={c?.zoho_item_id ?? ""} inputMode="numeric" /><FieldError message={fieldErrors.zohoItemId} /></div>
           <div className="space-y-1"><Label htmlFor="cd">Description</Label><Textarea id="cd" name="description" defaultValue={c?.description ?? ""} maxLength={500} /></div>
           <Button type="submit" className="w-full" disabled={pending}>Save</Button>
         </form>

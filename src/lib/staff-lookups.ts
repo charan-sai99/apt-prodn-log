@@ -12,7 +12,7 @@ export async function getFilterLookups(supabase: SupabaseClient) {
   return {
     machines,
     shifts,
-    components: components.map((c) => ({ id: c.id, component_name: c.component_name })),
+    components: components.map((c) => ({ id: c.id, component_name: c.component_name, raw_material: c.raw_material, is_active: c.is_active })),
     operators: (ops ?? []) as { id: string; display_name: string }[],
   };
 }

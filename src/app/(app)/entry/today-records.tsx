@@ -14,7 +14,7 @@ export function TodayRecords({
 }: {
   entries: EntryRow[];
   pendingByEntry: Record<string, CorrectionRequest>;
-  components: Pick<Component, "id" | "component_name" | "component_code">[];
+  components: Pick<Component, "id" | "component_name" | "component_code" | "raw_material">[];
   today: string;
 }) {
   const dates = [...new Set(entries.map((e) => e.production_date))].sort().reverse();

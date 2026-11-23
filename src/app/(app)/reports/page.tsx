@@ -135,6 +135,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
         <BucketTable title="Operator-wise" nameHeader="Operator" buckets={s.byOperator} total={s.totalQuantity} />
         <BucketTable title="Shift-wise" nameHeader="Shift" buckets={s.byShift} total={s.totalQuantity} />
         <BucketTable title="Component-wise" nameHeader="Component" buckets={s.byComponent} total={s.totalQuantity} />
+        <BucketTable title="Raw-material-wise (pieces)" nameHeader="Raw material" buckets={s.byRawMaterial} total={s.totalQuantity} />
       </div>
     </div>
   );

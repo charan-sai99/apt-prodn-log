@@ -26,6 +26,7 @@ export function row(p: Partial<EntryRow>): EntryRow {
     component_name: "N45 SPEEDO POINTER ASSEMBLY",
     component_code: "COM-SPA-00018",
     zoho_item_id: "74630000000006013",
+    raw_material: "TR ORANGE",
     ...p,
   };
 }

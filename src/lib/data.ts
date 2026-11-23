@@ -24,21 +24,37 @@ export async function getMachines(supabase: SupabaseClient, includeInactive = fa
   return (data ?? []) as Machine[];
 }
 
+const COMPONENT_COLUMNS = "id, zoho_item_id, component_code, component_name, description, product_type, raw_material, is_active";
+// Until migration 0005 is applied there is no raw_material column; fall back so the app keeps working.
+const COMPONENT_COLUMNS_PRE_0005 = "id, zoho_item_id, component_code, component_name, description, product_type, is_active";
+
 export async function getComponents(supabase: SupabaseClient, includeInactive = false): Promise<Component[]> {
+  const first = await loadComponents(supabase, includeInactive, COMPONENT_COLUMNS);
+  if (first.ok) return first.rows;
+  const fallback = await loadComponents(supabase, includeInactive, COMPONENT_COLUMNS_PRE_0005);
+  return fallback.rows.map((c) => ({ ...c, raw_material: c.raw_material ?? null }));
+}
+
+async function loadComponents(
+  supabase: SupabaseClient,
+  includeInactive: boolean,
+  columns: string,
+): Promise<{ ok: boolean; rows: Component[] }> {
   const out: Component[] = [];
   for (let from = 0; ; from += 1000) {
     let q = supabase
       .from("components")
-      .select("id, zoho_item_id, component_code, component_name, description, product_type, is_active")
+      .select(columns)
       .order("component_name")
       .range(from, from + 999);
     if (!includeInactive) q = q.eq("is_active", true);
     const { data, error } = await q;
-    if (error || !data) break;
-    out.push(...(data as Component[]));
+    if (error) return { ok: false, rows: out };
+    if (!data) break;
+    out.push(...(data as unknown as Component[]));
     if (data.length < 1000) break;
   }
-  return out;
+  return { ok: true, rows: out };
 }
 
 export const ENTRY_FETCH_LIMIT = 20000;

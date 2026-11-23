@@ -9,6 +9,7 @@ export interface PickerComponent {
   id: string;
   component_name: string;
   component_code: string | null;
+  raw_material?: string | null;
 }
 
 function normalise(s: string) {
@@ -42,7 +43,7 @@ export function ComponentPicker({
     if (!q) return components;
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     return components.filter((c) => {
-      const hay = `${c.component_name} ${c.component_code ?? ""}`.toLowerCase();
+      const hay = `${c.component_name} ${c.component_code ?? ""} ${c.raw_material ?? ""}`.toLowerCase();
       return normalise(hay).includes(q) || words.every((w) => hay.includes(w));
     });
   }, [components, query]);
@@ -71,7 +72,9 @@ export function ComponentPicker({
         {selected ? (
           <span className="min-w-0">
             <span className="block truncate font-semibold text-navy-900">{selected.component_name}</span>
-            {selected.component_code && <span className="block truncate text-xs text-muted">{selected.component_code}</span>}
+            {(selected.raw_material || selected.component_code) && (
+              <span className="block truncate text-xs text-muted">{[selected.raw_material, selected.component_code].filter(Boolean).join(" · ")}</span>
+            )}
           </span>
         ) : (
           <span className="text-slate-400">{placeholder}</span>
@@ -86,7 +89,7 @@ export function ComponentPicker({
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name or part code"
+              placeholder="Search part name or material"
               className="h-12 pl-10"
               aria-label="Search components"
               type="search"
@@ -130,7 +133,9 @@ function Option({ c, selected, onPick }: { c: PickerComponent; selected: boolean
       >
         <span className="min-w-0">
           <span className="block text-sm font-semibold text-navy-900">{c.component_name}</span>
-          {c.component_code && <span className="block text-xs text-muted">{c.component_code}</span>}
+          {(c.raw_material || c.component_code) && (
+            <span className="block text-xs text-muted">{[c.raw_material, c.component_code].filter(Boolean).join(" · ")}</span>
+          )}
         </span>
         {selected && <Check className="size-5 shrink-0 text-brand" />}
       </button>

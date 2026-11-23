@@ -14,6 +14,7 @@ export const ENTRY_COLUMNS: ExportColumn[] = [
   { header: "Shift", key: "shift", width: 7, value: (r) => r.shift },
   { header: "Machine", key: "machine", width: 9, value: (r) => r.machine_code },
   { header: "Component", key: "component", width: 44, value: (r) => r.component_name },
+  { header: "Raw material", key: "raw_material", width: 16, value: (r) => r.raw_material },
   { header: "Part code", key: "component_code", width: 18, value: (r) => r.component_code },
   { header: "Zoho Item ID", key: "zoho", width: 20, value: (r) => r.zoho_item_id },
   { header: "Quantity", key: "quantity", width: 10, value: (r) => r.quantity },
@@ -89,6 +90,7 @@ export async function buildWorkbook(input: WorkbookInput): Promise<Buffer> {
   section("By shift", input.summary.byShift.filter((b) => b.entries > 0));
   section("By operator", input.summary.byOperator);
   section("By component", input.summary.byComponent);
+  section("By raw material", input.summary.byRawMaterial);
   if (input.summary.byDate.length > 1) section("By date", input.summary.byDate);
   s.getColumn(2).numFmt = "#,##0";
 

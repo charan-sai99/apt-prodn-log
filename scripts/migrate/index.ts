@@ -4,6 +4,7 @@
  *
  *   npm run import:data -- components --master <APT_Production_Master.xlsx> [--items <Item.xlsx>]
  *   npm run import:data -- production --storage <legacy storage folder> [--master <xlsx>]
+ *   npm run import:data -- production-list --file <APT_ProdnList.xlsx> [--keep-others]
  *
  * Dry run by default: reads, validates, maps and writes a report — nothing is
  * sent to Supabase. To write, add:  --apply --project-ref <your-project-ref>
@@ -22,8 +23,9 @@ import path from "node:path";
 import ExcelJS from "exceljs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
-  componentsSeedSql, mapComponents, mapProduction, parseLogLines, readLegacyCsv, summariseIssues,
+  componentsSeedSql, mapComponents, mapProduction, mapProductionList, parseLogLines, productionListSql, readLegacyCsv, summariseIssues,
   type ComponentLookup, type Discrepancy, type ItemExportRow, type LegacyCsvRow, type LegacyLogLine, type MasterRow,
+  type ProductionListRow,
 } from "./core";
 
 type Args = Record<string, string | boolean>;
@@ -312,11 +314,82 @@ async function cmdProduction(args: Args) {
   console.log(`Errors: ${s0.errors} · warnings: ${s0.warnings}\nReport:  ${dir}\nBackup:  ${backupDir}\n`);
 }
 
+async function readProductionList(file: string): Promise<ProductionListRow[]> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(file);
+  const ws = wb.worksheets[0];
+  if (!ws) throw new Error("Workbook has no sheets");
+  const header = (ws.getRow(1).values as unknown[]).map((v) => String(v ?? "").trim().toLowerCase());
+  const find = (...names: string[]) => header.findIndex((h) => names.includes(h));
+  const nameCol = find("production part name", "part name", "component_name", "component name");
+  if (nameCol < 0) throw new Error(`No “Production Part Name” column (found: ${header.filter(Boolean).join(", ")})`);
+  const rawCol = find("raw material", "raw_material");
+  const rows: ProductionListRow[] = [];
+  for (let r = 2; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    rows.push({ row: r, name: row.getCell(nameCol).value, rawMaterial: rawCol > 0 ? row.getCell(rawCol).value : null });
+  }
+  return rows;
+}
+
+async function cmdProductionList(args: Args) {
+  const file = String(args.file ?? "");
+  if (!file || !existsSync(file)) throw new Error("--file <production list .xlsx> is required");
+  const backupDir = backup([file], "production-list");
+  const keepOthers = args["keep-others"] === true;
+  const { records, issues } = mapProductionList(await readProductionList(file), path.basename(file));
+  const apply = args.apply === true;
+  const summary: Record<string, unknown> = {
+    mode: apply ? "APPLY" : "DRY RUN (nothing written)",
+    file: path.resolve(file),
+    backup: backupDir,
+    componentsReady: records.length,
+    otherComponents: keepOthers ? "left unchanged (--keep-others)" : "deactivated (hidden from operators, history kept)",
+    rejected: issues.filter((i) => i.severity === "error").length,
+  };
+
+  if (apply) {
+    if (summariseIssues(issues).errors > 0) throw new Error("The list has errors (see the report). Nothing was written.");
+    const sb = supabaseFromEnv(args);
+    const { data: existing, error } = await sb.from("components").select("id, component_name, is_active");
+    if (error) throw new Error(`Could not read components: ${error.message}`);
+    const byName = new Map((existing ?? []).map((c) => [String(c.component_name).trim().toLowerCase(), c as { id: string; is_active: boolean }]));
+    let inserted = 0, updated = 0, deactivated = 0;
+    for (const r of records) {
+      const hit = byName.get(r.component_name.toLowerCase());
+      const { error: e } = hit
+        ? await sb.from("components").update({ component_name: r.component_name, raw_material: r.raw_material, is_active: true }).eq("id", hit.id)
+        : await sb.from("components").insert({ component_name: r.component_name, raw_material: r.raw_material, is_active: true });
+      if (e) throw new Error(`Writing “${r.component_name}” failed: ${e.message}`);
+      if (hit) updated++; else inserted++;
+    }
+    if (!keepOthers) {
+      const keep = new Set(records.map((r) => r.component_name.toLowerCase()));
+      for (const [name, c] of byName) {
+        if (c.is_active && !keep.has(name)) {
+          const { error: e } = await sb.from("components").update({ is_active: false }).eq("id", c.id);
+          if (e) throw new Error(`Deactivating a component failed: ${e.message}`);
+          deactivated++;
+        }
+      }
+    }
+    Object.assign(summary, { inserted, updated, deactivated });
+  }
+
+  const dir = writeReport("production-list", summary, issues, {
+    "production_components.sql": productionListSql(records, { keepOthers, label: path.basename(file) }),
+    "production_components.json": JSON.stringify(records, null, 2),
+  });
+  console.log(`\n${summary.mode}\nProduction components ready: ${records.length}  ·  rejected: ${summary.rejected}`);
+  console.log(`Report:  ${dir}\nBackup:  ${backupDir}\n`);
+}
+
 async function main() {
   const { cmd, args } = parseArgs(process.argv.slice(2));
   loadEnv(String(args["env"] ?? ".env.local"));
   if (cmd === "components") return cmdComponents(args);
   if (cmd === "production") return cmdProduction(args);
+  if (cmd === "production-list") return cmdProductionList(args);
   console.log(readFileSync(__filename, "utf8").split("*/")[0]);
 }
 

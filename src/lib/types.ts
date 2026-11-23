@@ -27,6 +27,7 @@ export interface Component {
   component_name: string;
   description: string | null;
   product_type: string | null;
+  raw_material: string | null;
   is_active: boolean;
 }
 
@@ -78,6 +79,7 @@ export interface EntryRow {
   component_name: string;
   component_code: string | null;
   zoho_item_id: string | null;
+  raw_material: string | null;
 }
 
 export interface CorrectionRequest {

@@ -73,7 +73,9 @@ export default async function RecordsPage({ searchParams }: { searchParams: Sear
                 <TD className="font-semibold">{r.machine_code}</TD>
                 <TD className="min-w-56">
                   <span className="font-medium">{r.component_name}</span>
-                  {r.component_code && <span className="block text-xs text-muted">{r.component_code}</span>}
+                  {(r.raw_material || r.component_code) && (
+                    <span className="block text-xs text-muted">{[r.raw_material, r.component_code].filter(Boolean).join(" · ")}</span>
+                  )}
                 </TD>
                 <TD className={`text-right font-bold tabular ${r.status === "voided" ? "line-through" : ""}`}>{formatQty(r.quantity)}</TD>
                 <TD className="whitespace-nowrap">
@@ -83,7 +85,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Sear
                 </TD>
                 <TD className="whitespace-nowrap text-xs text-muted">{formatTimestamp(r.created_at, settings.timezone)}</TD>
                 <TD>{r.status === "voided" ? <Badge variant="danger">Voided</Badge> : <Badge variant="success">Active</Badge>}</TD>
-                <TD>{r.status === "active" && <CorrectionDialog entry={r} components={lookups.components.map((c) => ({ ...c, component_code: null }))} />}</TD>
+                <TD>{r.status === "active" && <CorrectionDialog entry={r} components={lookups.components.filter((c) => c.is_active).map((c) => ({ ...c, component_code: null }))} />}</TD>
               </tr>
             ))}
           </tbody>

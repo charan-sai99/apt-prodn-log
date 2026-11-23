@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { createTestDatabase, Db, expectDbError, seedUser, SUBMIT_SQL } from "./helpers";
 
 // Runs twice: on a fresh project and on one that already has the Stock Portal schema.
@@ -347,5 +349,35 @@ describe("legacy import rows (database side)", () => {
     );
     const [log] = await db.owner<{ changed_by: string | null; action: string }>("select changed_by, action from production_audit_logs where entity_id=$1", [first[0]!.id]);
     expect(log).toEqual({ changed_by: null, action: "insert" });
+  });
+});
+
+describe("production component list (Zoho-independent)", () => {
+  let db: Db;
+  beforeAll(async () => {
+    await createTestDatabase("prodlog_test_plist", { withStockPortal: true });
+    db = new Db("prodlog_test_plist", 5);
+  });
+  afterAll(async () => db?.end());
+
+  it("activates the 24 child parts with raw material and hides older items without deleting them", async () => {
+    const seed = (f: string) => readFileSync(path.resolve(__dirname, "../../supabase/seed", f), "utf8");
+    await db.owner(seed("components_seed.sql"));
+    const [old] = await db.owner<{ id: string }>("select id from components where component_name = 'N45 SPEEDO POINTER ASSEMBLY'");
+    const [mach] = await db.owner<{ id: string }>("select id from machines where machine_code='VIM1'");
+    const [e] = await db.owner<{ id: string }>(
+      "insert into production_entries (machine_id, component_id, production_date, hour_slot, quantity, source, legacy_operator_name) values ($1,$2,'2026-01-05',8,10,'legacy_import','Ravi') returning id",
+      [mach!.id, old!.id],
+    );
+    await db.owner(seed("production_components.sql"));
+    await db.owner(seed("production_components.sql")); // re-run is harmless
+    const active = await db.owner<{ component_name: string; raw_material: string; zoho_item_id: string | null }>("select component_name, raw_material, zoho_item_id from components where is_active order by component_name");
+    expect(active).toHaveLength(24);
+    expect(active.every((c) => c.raw_material && c.zoho_item_id === null)).toBe(true);
+    expect(active.find((c) => c.component_name === "SPACER 4MM")!.raw_material).toBe("NYLON 30 BLACK");
+    const [{ n }] = (await db.owner<{ n: number }>("select count(*)::int n from components")) as [{ n: number }];
+    expect(n).toBe(270);
+    const [view] = await db.owner<{ component_name: string; raw_material: string | null }>("select component_name, raw_material from production_entries_enriched where id=$1", [e!.id]);
+    expect(view!.component_name).toBe("N45 SPEEDO POINTER ASSEMBLY"); // history keeps the old part
   });
 });

@@ -13,6 +13,7 @@ export interface ProductionSummary {
   activeOperators: number;
   byMachine: Bucket[];
   byComponent: Bucket[];
+  byRawMaterial: Bucket[];
   byOperator: Bucket[];
   byShift: Bucket[];
   byHour: Bucket[];
@@ -42,6 +43,7 @@ export function summarize(
   const active = rows.filter((r) => r.status === "active");
   const machine = new Map<string, Bucket>();
   const component = new Map<string, Bucket>();
+  const material = new Map<string, Bucket>();
   const operator = new Map<string, Bucket>();
   const shift = new Map<string, Bucket>();
   const hour = new Map<string, Bucket>();
@@ -59,6 +61,7 @@ export function summarize(
     total += r.quantity;
     bump(machine, r.machine_code, r.machine_code, r.quantity);
     bump(component, r.component_id, r.component_name, r.quantity);
+    bump(material, r.raw_material ?? "-", r.raw_material ?? "Not set", r.quantity);
     bump(operator, r.operator_id ?? `legacy:${r.operator_name ?? "unknown"}`, r.operator_name ?? "Unknown", r.quantity);
     bump(shift, r.shift ?? "-", r.shift ? `Shift ${r.shift}` : "No shift", r.quantity);
     const hk = String(r.hour_slot).padStart(2, "0");
@@ -75,6 +78,7 @@ export function summarize(
     activeOperators: new Set(active.map((r) => r.operator_id ?? `legacy:${r.operator_name}`)).size,
     byMachine: machineList,
     byComponent: [...component.values()].sort(byQtyDesc),
+    byRawMaterial: [...material.values()].sort(byQtyDesc),
     byOperator: [...operator.values()].sort(byQtyDesc),
     byShift: [...shift.values()].sort((a, b) => a.key.localeCompare(b.key)),
     byHour: [...hour.values()],

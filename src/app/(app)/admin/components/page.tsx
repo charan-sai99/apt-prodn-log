@@ -12,7 +12,7 @@ export default async function ComponentsPage() {
   const components = await getComponents(await createClient(), true);
   return (
     <div>
-      <PageHeader title="Component master" description={`${components.filter((c) => c.is_active).length} active of ${components.length}. Only active components can be selected by operators.`} />
+      <PageHeader title="Component master" description={`${components.filter((c) => c.is_active).length} active of ${components.length}. Only active components can be selected by operators. Production parts don't need a Zoho ID.`} />
       <ComponentsManager components={components} />
     </div>
   );

@@ -83,6 +83,9 @@ Short version, after reviewing the SQL:
 npm run import:data -- components --master legacy/streamlit/data/APT_Production_Master.xlsx --items Item.xlsx
 npm run import:data -- production --storage /path/to/legacy/storage
 
+# production component list (child parts + raw material, no Zoho ID) → SQL for the SQL editor
+npm run import:data -- production-list --file APT_ProdnList.xlsx
+
 # write (only after reviewing the report)
 npm run import:data -- production --storage /path/to/legacy/storage --apply --project-ref <ref>
 ```

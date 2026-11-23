@@ -39,8 +39,10 @@ describe("Excel export", () => {
     expect(summary.getCell("B5").value).toBe(47);
     const rec = wb.getWorksheet("Records")!;
     expect(rec.rowCount).toBe(4);
-    expect(rec.getRow(1).getCell(8).value).toBe("Quantity");
-    expect(rec.getRow(3).getCell(8).value).toBe(32);
+    expect(rec.getRow(1).getCell(6).value).toBe("Raw material");
+    expect(rec.getRow(2).getCell(6).value).toBe("TR ORANGE");
+    expect(rec.getRow(1).getCell(9).value).toBe("Quantity");
+    expect(rec.getRow(3).getCell(9).value).toBe(32);
     expect(rec.getRow(4).getCell(5).value).toBe("'+cmd");
   });
 });

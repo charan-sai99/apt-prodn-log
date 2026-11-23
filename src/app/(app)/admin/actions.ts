@@ -173,6 +173,7 @@ export async function saveComponent(input: unknown): Promise<ActionResult> {
   const row = {
     component_name: v.componentName, component_code: v.componentCode || null,
     zoho_item_id: v.zohoItemId || null, description: v.description || null,
+    raw_material: v.rawMaterial ? v.rawMaterial.replace(/\s+/g, " ").toUpperCase() : null,
   };
   const supabase = await createClient();
   const { error } = v.id ? await supabase.from("components").update(row).eq("id", v.id) : await supabase.from("components").insert(row);

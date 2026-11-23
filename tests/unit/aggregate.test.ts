@@ -28,6 +28,10 @@ describe("dashboard aggregation", () => {
     expect(s.byShift.map((b) => [b.key, b.quantity])).toEqual([["A", 150], ["B", 200]]);
     expect(s.byDate.map((b) => [b.key, b.quantity])).toEqual([["2026-11-19", 0], ["2026-11-20", 350]]);
   });
+  it("groups by raw material", () => {
+    const m = summarize([row({ raw_material: "PC BLACK", quantity: 10 }), row({ raw_material: "PC BLACK", quantity: 5 }), row({ raw_material: null, quantity: 2 })]);
+    expect(m.byRawMaterial.map((b) => [b.label, b.quantity])).toEqual([["PC BLACK", 15], ["Not set", 2]]);
+  });
   it("handles legacy rows without an operator account", () => {
     const t = summarize([row({ operator_id: null, operator_name: "Ramesh (legacy)" })]);
     expect(t.byOperator[0]!.label).toBe("Ramesh (legacy)");
