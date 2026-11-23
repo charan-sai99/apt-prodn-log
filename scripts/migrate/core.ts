@@ -407,54 +407,10 @@ on conflict (zoho_item_id) do update
 }
 
 // ----------------------------------------------------------------- production component list
-// Moulded child parts, managed independently of Zoho (no Item ID). Source:
-// a sheet with "Production Part Name" and optional "RAW MATERIAL" columns.
-export interface ProductionListRow {
-  row: number;
-  name: unknown;
-  rawMaterial: unknown;
-}
-export interface ProductionComponent {
-  component_name: string;
-  raw_material: string | null;
-}
-
-const clean = (v: unknown) => cellText(v).replace(/\s+/g, " ").trim();
-
-export function mapProductionList(rows: ProductionListRow[], source = "production list") {
-  const issues: Discrepancy[] = [];
-  const records: ProductionComponent[] = [];
-  const seen = new Map<string, number>();
-  let blank = 0;
-  for (const r of rows) {
-    const name = clean(r.name);
-    if (!name) {
-      blank++;
-      continue;
-    }
-    if (name.length > 200) {
-      issues.push({ severity: "error", source, line: r.row, code: "NAME_TOO_LONG", message: `“${name.slice(0, 40)}…” is longer than 200 characters` });
-      continue;
-    }
-    const key = name.toLowerCase();
-    if (seen.has(key)) {
-      issues.push({ severity: "error", source, line: r.row, code: "DUPLICATE_NAME", message: `“${name}” is also on row ${seen.get(key)}` });
-      continue;
-    }
-    seen.set(key, r.row);
-    const raw = clean(r.rawMaterial);
-    if (!raw) issues.push({ severity: "warning", source, line: r.row, code: "MISSING_RAW_MATERIAL", message: `“${name}” has no raw material` });
-    if (raw.length > 80) {
-      issues.push({ severity: "error", source, line: r.row, code: "RAW_MATERIAL_TOO_LONG", message: `Raw material for “${name}” is longer than 80 characters` });
-      continue;
-    }
-    records.push({ component_name: name, raw_material: raw || null });
-  }
-  if (blank) {
-    issues.push({ severity: "info", source, line: null, code: "BLANK_ROWS_SKIPPED", message: `${blank} row(s) without a part name were skipped` });
-  }
-  return { records, issues };
-}
+// Shared with the admin upload in the app (src/lib/production-list.ts).
+import { mapProductionList, type ProductionComponent, type ProductionListRow } from "../../src/lib/production-list";
+export { mapProductionList };
+export type { ProductionComponent, ProductionListRow };
 
 /**
  * SQL that makes the given list the active production components:

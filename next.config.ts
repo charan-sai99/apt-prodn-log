@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ["exceljs"],
+  experimental: {
+    // Admins upload the production component list (.xlsx) through a server action.
+    serverActions: { bodySizeLimit: "3mb" },
+  },
   async headers() {
     return [
       { source: "/(.*)", headers: securityHeaders },

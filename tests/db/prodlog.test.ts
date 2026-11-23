@@ -381,3 +381,55 @@ describe("production component list (Zoho-independent)", () => {
     expect(view!.component_name).toBe("N45 SPEEDO POINTER ASSEMBLY"); // history keeps the old part
   });
 });
+
+describe("uploading the production list (apply_production_list)", () => {
+  let db: Db;
+  let admin = "";
+  let sup = "";
+  beforeAll(async () => {
+    await createTestDatabase("prodlog_test_upload", { withStockPortal: true });
+    db = new Db("prodlog_test_upload", 5);
+    admin = await seedUser(db, "admin", "Admin U", { code: "ADMU" });
+    sup = await seedUser(db, "supervisor", "Sup U", { code: "SUPU" });
+    await db.owner("insert into components (component_name, raw_material, is_active) values ('N45 CAP','PC GREY',true),('Spacer 2mm','NYLON 30 WHITE',true),('PUSHER CAP','NYLON 6 WHITE',false),('OLD ASSEMBLY',null,true)");
+  });
+  afterAll(async () => db?.end());
+  const items = JSON.stringify([
+    { component_name: "N45 CAP", raw_material: "PC BLACK" },
+    { component_name: "SPACER 2MM", raw_material: "NYLON 30 WHITE" },
+    { component_name: "PUSHER CAP", raw_material: "NYLON 6 WHITE" },
+    { component_name: "  NEW   BUSH ", raw_material: "PC WHITE" },
+  ]);
+
+  it("is admin-only", async () => {
+    await expectDbError(db.as(sup, "select apply_production_list($1::jsonb, true)", [items]), "FORBIDDEN");
+    await expectDbError(db.as(null, "select apply_production_list($1::jsonb, true)", [items]), "permission denied");
+  });
+  it("adds, updates, re-activates and hides in one go, and is audited", async () => {
+    const [{ r }] = (await db.as<{ r: Record<string, number> }>(admin, "select apply_production_list($1::jsonb, true) r", [items])) as [{ r: Record<string, number> }];
+    expect(r).toMatchObject({ inserted: 1, updated: 2, reactivated: 1, hidden: 1, total: 4 });
+    const rows = await db.owner<{ component_name: string; raw_material: string; is_active: boolean }>("select component_name, raw_material, is_active from components order by component_name");
+    expect(rows).toEqual([
+      { component_name: "N45 CAP", raw_material: "PC BLACK", is_active: true },
+      { component_name: "NEW BUSH", raw_material: "PC WHITE", is_active: true },
+      { component_name: "OLD ASSEMBLY", raw_material: null, is_active: false },
+      { component_name: "PUSHER CAP", raw_material: "NYLON 6 WHITE", is_active: true },
+      { component_name: "SPACER 2MM", raw_material: "NYLON 30 WHITE", is_active: true },
+    ]);
+    const [{ n }] = (await db.owner<{ n: number }>("select count(*)::int n from production_audit_logs where entity_type='components' and changed_by=$1", [admin])) as [{ n: number }];
+    expect(n).toBe(5);
+    const [again] = await db.as<{ r: Record<string, number> }>(admin, "select apply_production_list($1::jsonb, true) r", [items]);
+    expect(again!.r).toMatchObject({ inserted: 0, updated: 0, reactivated: 0, hidden: 0 });
+  });
+  it("rejects duplicates and empty lists without changing anything", async () => {
+    await expectDbError(db.as(admin, "select apply_production_list($1::jsonb, true)", [JSON.stringify([{ component_name: "A", raw_material: null }, { component_name: "a", raw_material: null }])]), "appears twice");
+    await expectDbError(db.as(admin, "select apply_production_list('[]'::jsonb, true)"), "no parts");
+    const [{ n }] = (await db.owner<{ n: number }>("select count(*)::int n from components where lower(component_name)='a'")) as [{ n: number }];
+    expect(n).toBe(0);
+  });
+  it("can leave other parts active", async () => {
+    await db.as(admin, "select apply_production_list($1::jsonb, false)", [JSON.stringify([{ component_name: "EXTRA PART", raw_material: "PC RED" }])]);
+    const [{ n }] = (await db.owner<{ n: number }>("select count(*)::int n from components where is_active")) as [{ n: number }];
+    expect(n).toBe(5);
+  });
+});

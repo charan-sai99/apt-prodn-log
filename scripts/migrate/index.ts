@@ -22,6 +22,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import path from "node:path";
 import ExcelJS from "exceljs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { readProductionListWorkbook } from "../../src/lib/production-list";
 import {
   componentsSeedSql, mapComponents, mapProduction, mapProductionList, parseLogLines, productionListSql, readLegacyCsv, summariseIssues,
   type ComponentLookup, type Discrepancy, type ItemExportRow, type LegacyCsvRow, type LegacyLogLine, type MasterRow,
@@ -315,21 +316,7 @@ async function cmdProduction(args: Args) {
 }
 
 async function readProductionList(file: string): Promise<ProductionListRow[]> {
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(file);
-  const ws = wb.worksheets[0];
-  if (!ws) throw new Error("Workbook has no sheets");
-  const header = (ws.getRow(1).values as unknown[]).map((v) => String(v ?? "").trim().toLowerCase());
-  const find = (...names: string[]) => header.findIndex((h) => names.includes(h));
-  const nameCol = find("production part name", "part name", "component_name", "component name");
-  if (nameCol < 0) throw new Error(`No “Production Part Name” column (found: ${header.filter(Boolean).join(", ")})`);
-  const rawCol = find("raw material", "raw_material");
-  const rows: ProductionListRow[] = [];
-  for (let r = 2; r <= ws.rowCount; r++) {
-    const row = ws.getRow(r);
-    rows.push({ row: r, name: row.getCell(nameCol).value, rawMaterial: rawCol > 0 ? row.getCell(rawCol).value : null });
-  }
-  return rows;
+  return readProductionListWorkbook(readFileSync(file));
 }
 
 async function cmdProductionList(args: Args) {

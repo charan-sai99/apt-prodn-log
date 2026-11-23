@@ -14,7 +14,7 @@ Replaces the earlier Streamlit app (kept unchanged in [`legacy/streamlit/`](lega
 |---|---|
 | **Operator** | Sign in with employee code · see assigned machine(s) · log hourly production (date, shift, hour, component, quantity) · see today's and past submissions · request corrections (never edit directly) |
 | **Supervisor** | Dashboard for all 5 machines (live) · filter records by date/machine/operator/component/shift/search · daily/weekly/monthly + machine/operator/component reports · CSV & Excel export · approve/reject corrections · audit log · record on behalf of an operator · assign operators to machines |
-| **Administrator** | Everything above + create/deactivate accounts, set roles, reset operator passwords · assign operators to machines · manage machines, components, shifts and factory settings |
+| **Administrator** | Everything above + create/deactivate accounts, set roles, reset operator passwords · assign operators to machines · manage machines, components, shifts and factory settings · **upload the production component list from Excel** (preview, then apply) |
 
 Business rules carried over from the legacy app: production time can't be in the future; quantity is a whole number ≥ 1; every entry records operator **and** who entered it; machines `vim1…vim4, him` → `VIM1…VIM4, HIM`; components come from the master list.
 

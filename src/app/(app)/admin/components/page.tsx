@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getComponents } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { ComponentsManager } from "./components-manager";
+import { ListUpload } from "./list-upload";
 
 export const metadata = { title: "Components" };
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export default async function ComponentsPage() {
   return (
     <div>
       <PageHeader title="Component master" description={`${components.filter((c) => c.is_active).length} active of ${components.length}. Only active components can be selected by operators. Production parts don't need a Zoho ID.`} />
+      <ListUpload />
       <ComponentsManager components={components} />
     </div>
   );
