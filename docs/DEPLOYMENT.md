@@ -1,5 +1,23 @@
 # Deploying to Netlify
 
+## Release workflow (keep production deploys rare)
+Branch deploys and Deploy Previews cost 0 Netlify credits; production deploys do not. So:
+
+1. **All work goes to the `dev` branch.** Every push builds a preview at
+   **https://dev--apt-prodn-log.netlify.app** (sign in with your Netlify account to view it).
+2. **Test there.** It uses the same Supabase database as production, so test with a test operator and
+   void any test entries afterwards.
+3. **Release in batches:** when a set of changes is ready, merge `dev` into `main`
+   (GitHub → Pull requests → New → base `main`, compare `dev` → Merge). That is the only production deploy.
+4. Database changes (`supabase/migrations/…`) are run in the Supabase SQL editor **before** merging the app
+   change that needs them. Write them so the old app version keeps working (add columns, never drop).
+
+Once the app settles, a few production deploys a month is enough.
+
+Netlify setting needed once: Project configuration → Build & deploy → Branches and deploy contexts →
+**Branch deploys: Let me add individual branches → `dev`**, and **Deploy Previews: Any pull request**.
+
+
 ## Prerequisites
 - Database migrations reviewed and applied, and a first admin created (see DATABASE.md). The app runs without them but nobody can sign in.
 - This repository is on GitHub (branch `nextjs-migration`, or `main` once merged).
