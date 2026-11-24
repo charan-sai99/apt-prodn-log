@@ -33,7 +33,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         )}
         {sp.reason === "idle" && <Alert variant="info" className="mb-4">You were signed out after 10 minutes without activity.</Alert>}
         {error === "not_migrated" && <Alert variant="warning" className="mb-4">Photo sign-in is not set up in the database yet (migration 0007). Administrators can still sign in below.</Alert>}
-        {(error === "not_configured" || error === "unavailable") && <Alert variant="warning" className="mb-4">The list of people could not be loaded. Administrators can still sign in below.</Alert>}
+        {error === "not_configured" && <Alert variant="warning" className="mb-4">The server key (SUPABASE_SECRET_KEY) is not set, so the list of people cannot be loaded. Administrators can still sign in below.</Alert>}
+        {error === "unavailable" && <Alert variant="warning" className="mb-4">The list of people could not be loaded (database not reachable). Administrators can still sign in below.</Alert>}
         {!error && roster.length === 0 && <Alert variant="info" className="mb-4">No people set up yet. The administrator adds them under Users.</Alert>}
 
         <PinLogin roster={roster} next={sp.next ?? "/"} timezone={DEFAULT_FACTORY_TIMEZONE} />
