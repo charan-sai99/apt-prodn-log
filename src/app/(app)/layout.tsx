@@ -4,6 +4,8 @@ import { navFor } from "@/components/nav-config";
 import { MobileNav, Sidebar } from "@/components/app-nav";
 import { Brand } from "@/components/brand";
 import { IdleSignOut } from "@/components/idle-sign-out";
+import { Avatar } from "@/components/avatar";
+import { getPhotoVersions } from "@/lib/photo-versions";
 import { signOut, signOutIdle } from "../(auth)/actions";
 
 const ROLE_LABEL = { operator: "Operator", supervisor: "Supervisor", admin: "Administrator" } as const;
@@ -11,6 +13,7 @@ const IDLE_MINUTES = 10;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireSession();
+  const photoVersion = (await getPhotoVersions())[profile.id] ?? null;
   const items = navFor(profile.role);
   const roleLabel = ROLE_LABEL[profile.role];
   const pinUser = profile.role !== "admin"; // operators & supervisors use photo + PIN on shared phones
@@ -18,12 +21,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-dvh">
       {pinUser && <IdleSignOut minutes={IDLE_MINUTES} action={signOutIdle} />}
-      <Sidebar items={items} userName={profile.display_name} roleLabel={roleLabel} signOut={signOut} exitLabel={exitLabel} />
+      <Sidebar items={items} userName={profile.display_name} roleLabel={roleLabel} signOut={signOut} exitLabel={exitLabel} userId={profile.id} photoVersion={photoVersion} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-navy-900 px-4 py-2.5 pt-safe lg:hidden">
           <Brand inverted compact />
-          <div className="flex items-center gap-3">
-            <div className="text-right leading-tight">
+          <div className="flex items-center gap-2.5">
+            <Avatar id={profile.id} name={profile.display_name} version={photoVersion} size={36} />
+            <div className="leading-tight">
               <p className="max-w-[9rem] truncate text-sm font-semibold text-white">{profile.display_name}</p>
               <p className="text-[11px] text-slate-300">{roleLabel}</p>
             </div>

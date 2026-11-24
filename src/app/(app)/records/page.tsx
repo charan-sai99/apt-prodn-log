@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { EmptyRow, Table, TD, TH, THead } from "@/components/ui/table";
 import { CorrectionDialog } from "@/components/correction-dialog";
+import { PersonName } from "@/components/avatar";
+import { getPhotoVersions } from "@/lib/photo-versions";
 import { formatQty } from "@/lib/utils";
 
 export const metadata = { title: "Production records" };
@@ -28,7 +30,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Sear
   const filters = parseRecordFilters(sp, { from: today, to: today });
   const page = Math.max(1, Number.parseInt(str(sp.page) ?? "1", 10) || 1);
 
-  const [lookups, { rows, truncated, error }] = await Promise.all([getFilterLookups(supabase), fetchEntries(supabase, filters)]);
+  const [lookups, { rows, truncated, error }, photos] = await Promise.all([getFilterLookups(supabase), fetchEntries(supabase, filters), getPhotoVersions()]);
   const summary = summarize(rows);
   const pageRows = rows.slice((page - 1) * PAGE, page * PAGE);
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
@@ -76,9 +78,10 @@ export default async function RecordsPage({ searchParams }: { searchParams: Sear
                 </TD>
                 <TD className={`text-right font-bold tabular ${r.status === "voided" ? "line-through" : ""}`}>{formatQty(r.quantity)}</TD>
                 <TD className="whitespace-nowrap">
-                  {r.operator_name ?? "—"}
-                  {r.entered_by_name && r.entered_by !== r.operator_id && <span className="block text-xs text-muted">by {r.entered_by_name}</span>}
-                  {r.source === "legacy_import" && <span className="block text-xs text-muted">legacy import</span>}
+                  <PersonName id={r.operator_id} name={r.operator_name} version={r.operator_id ? photos[r.operator_id] : null}>
+                    {r.entered_by_name && r.entered_by !== r.operator_id && <span className="block text-xs text-muted">by {r.entered_by_name}</span>}
+                    {r.source === "legacy_import" && <span className="block text-xs text-muted">legacy import</span>}
+                  </PersonName>
                 </TD>
                 <TD className="whitespace-nowrap text-xs text-muted">{formatTimestamp(r.created_at, settings.timezone)}</TD>
                 <TD>{r.status === "voided" ? <Badge variant="danger">Voided</Badge> : <Badge variant="success">Active</Badge>}</TD>

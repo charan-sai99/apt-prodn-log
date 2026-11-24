@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import type { CorrectionRequest, EntryRow, Machine } from "@/lib/types";
 import { EntryForm } from "./entry-form";
 import { TodayRecords } from "./today-records";
+import { getPhotoVersions } from "@/lib/photo-versions";
 
 export const metadata: Metadata = { title: "Log production" };
 export const dynamic = "force-dynamic";
@@ -67,10 +68,11 @@ export default async function EntryPage() {
     return { machines, operators };
   };
 
-  const [{ machines, operators }, { data: recent }, { data: pending }] = await Promise.all([
+  const [{ machines, operators }, { data: recent }, { data: pending }, photos] = await Promise.all([
     loadMachines(),
     recentQuery,
     supabase.from("correction_requests").select("*").eq("requested_by", userId).eq("status", "pending"),
+    getPhotoVersions(),
   ]);
   const entries = (recent ?? []) as EntryRow[];
   const pendingByEntry = Object.fromEntries(
@@ -86,7 +88,7 @@ export default async function EntryPage() {
             ? "You are not assigned to any machine yet. Ask your administrator to assign you before logging production."
             : "There are no active machines. Add or activate machines under Admin → Machines."}
         </Alert>
-        {entries.length > 0 && <TodayRecords entries={entries} pendingByEntry={pendingByEntry} components={components} today={now.date} />}
+        {entries.length > 0 && <TodayRecords entries={entries} pendingByEntry={pendingByEntry} components={components} today={now.date} photos={photos} />}
       </div>
     );
   }
@@ -94,6 +96,8 @@ export default async function EntryPage() {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <EntryForm
+        operatorId={userId}
+        photos={photos}
         operatorName={profile.display_name}
         operatorCode={profile.employee_code}
         isOperator={isOperator}
@@ -114,7 +118,7 @@ export default async function EntryPage() {
           operatorId: e.operator_id,
         }))}
       />
-      <TodayRecords entries={entries} pendingByEntry={pendingByEntry} components={components} today={now.date} />
+      <TodayRecords entries={entries} pendingByEntry={pendingByEntry} components={components} today={now.date} photos={photos} />
     </div>
   );
 }

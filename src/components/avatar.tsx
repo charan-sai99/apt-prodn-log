@@ -30,3 +30,31 @@ export function Avatar({
     </span>
   );
 }
+
+/** Photo + name, used wherever a person appears in lists and tables. */
+export function PersonName({
+  id,
+  name,
+  version,
+  size = 28,
+  className,
+  children,
+}: {
+  id: string | null | undefined;
+  name: string | null | undefined;
+  version?: number | null;
+  size?: number;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  if (!name) return <span className={className}>—</span>;
+  return (
+    <span className={cn("inline-flex items-center gap-2", className)}>
+      {id ? <Avatar id={id} name={name} version={version} size={size} /> : null}
+      <span className="min-w-0">
+        <span className="block truncate">{name}</span>
+        {children}
+      </span>
+    </span>
+  );
+}

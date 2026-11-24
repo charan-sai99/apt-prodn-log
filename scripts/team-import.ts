@@ -26,7 +26,7 @@ const teamSchema = z.object({
     designation: z.string().trim().max(60).nullable().optional(),
     role: z.enum(["operator", "supervisor"]),
     displayOrder: z.number().int().min(0).max(9999),
-    photo: z.string().regex(/^[\w.-]+\.(jpe?g)$/i).nullable().optional(),
+    photo: z.string().regex(/^[\w.-]+\.(jpe?g|png|webp)$/i).nullable().optional(),
   })).min(1),
 });
 
@@ -117,7 +117,7 @@ async function main() {
     if (photoFile) {
       if (apply && id) {
         const data = readFileSync(photoFile).toString("base64");
-        const { error: fe } = await sb.from("profile_photos").upsert({ profile_id: id, content_type: "image/jpeg", data_base64: data, updated_at: new Date().toISOString() });
+        const { error: fe } = await sb.from("profile_photos").upsert({ profile_id: id, content_type: photoType(photoFile), data_base64: data, updated_at: new Date().toISOString() });
         if (fe) throw new Error(`Photo for ${p.name} failed: ${fe.message}`);
       }
       photos++;
@@ -130,3 +130,8 @@ main().catch((e) => {
   console.error(`\n✖ ${(e as Error).message}\n`);
   process.exit(1);
 });
+
+function photoType(file: string): "image/jpeg" | "image/png" | "image/webp" {
+  const ext = path.extname(file).toLowerCase();
+  return ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+}

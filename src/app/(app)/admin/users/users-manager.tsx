@@ -175,8 +175,8 @@ function PhotoDialog({ u, version }: { u: Profile; version?: number }) {
                 const f = fileRef.current?.files?.[0];
                 if (!f) return setError("Choose a photo first.");
                 try {
-                  const dataBase64 = await resizePhoto(f);
-                  run(() => setPhoto({ userId: u.id, contentType: "image/jpeg", dataBase64 }), () => setOpen(false));
+                  const photo = await resizePhoto(f);
+                  run(() => setPhoto({ userId: u.id, ...photo }), () => setOpen(false));
                 } catch {
                   setError("That file could not be read as a picture.");
                 }

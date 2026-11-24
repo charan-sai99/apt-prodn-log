@@ -15,6 +15,8 @@ import { Alert } from "@/components/ui/alert";
 import { HorizontalBarChart, QuantityBarChart, TrendLineChart } from "@/components/charts";
 import { LiveRefresh } from "@/components/live-refresh";
 import { formatQty } from "@/lib/utils";
+import { Avatar } from "@/components/avatar";
+import { getPhotoVersions } from "@/lib/photo-versions";
 
 export const metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -28,10 +30,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   const isToday = date === now.date;
 
   const week = lastNDays(7, date);
-  const [machines, { rows, error, truncated }, { data: assignments }] = await Promise.all([
+  const [machines, { rows, error, truncated }, { data: assignments }, photos] = await Promise.all([
     getMachines(supabase),
     fetchEntries(supabase, { from: week.from, to: week.to }),
-    supabase.from("machine_assignments").select("machine_id, operator:profiles!machine_assignments_operator_id_fkey(display_name)").eq("is_active", true),
+    supabase.from("machine_assignments").select("machine_id, operator:profiles!machine_assignments_operator_id_fkey(id, display_name)").eq("is_active", true),
+    getPhotoVersions(),
   ]);
 
   const dayRows = rows.filter((r) => r.production_date === date);
@@ -39,10 +42,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   const day = summarize(dayRows, { machineOrder });
   const weekSummary = summarize(rows, { dates: datesBetween(week.from, week.to) });
 
-  const operatorsByMachine = new Map<string, string[]>();
-  for (const a of (assignments ?? []) as unknown as { machine_id: string; operator: { display_name: string } | null }[]) {
+  const operatorsByMachine = new Map<string, { id: string; display_name: string }[]>();
+  for (const a of (assignments ?? []) as unknown as { machine_id: string; operator: { id: string; display_name: string } | null }[]) {
     if (!a.operator) continue;
-    operatorsByMachine.set(a.machine_id, [...(operatorsByMachine.get(a.machine_id) ?? []), a.operator.display_name]);
+    operatorsByMachine.set(a.machine_id, [...(operatorsByMachine.get(a.machine_id) ?? []), a.operator]);
   }
 
   const lastHourByMachine = new Map<string, number>();
@@ -108,9 +111,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                 <p className="text-xs text-muted">
                   {b?.entries ?? 0} entries{last !== undefined ? ` · last ${formatHourSlot(last)}` : ""}
                 </p>
-                <p className="mt-2 truncate text-xs text-muted">
-                  Operators: {operatorsByMachine.get(m.id)?.join(", ") || "none assigned"}
-                </p>
+                {(() => {
+                  const ops = operatorsByMachine.get(m.id) ?? [];
+                  return ops.length ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex -space-x-2">
+                        {ops.slice(0, 4).map((o) => (
+                          <Avatar key={o.id} id={o.id} name={o.display_name} version={photos[o.id]} size={30} className="ring-2 ring-white" />
+                        ))}
+                      </div>
+                      <p className="min-w-0 truncate text-xs text-muted">{ops.map((o) => o.display_name).join(", ")}</p>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted">No operator assigned</p>
+                  );
+                })()}
               </Card>
             </Link>
           );

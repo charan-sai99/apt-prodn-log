@@ -6,7 +6,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { CheckCircle2, ClipboardCheck, Factory, Loader2, Send, User } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Factory, Loader2, Send } from "lucide-react";
 import { entrySchema } from "@/lib/validation";
 import { factoryNow, formatDisplayDate, formatHourSlot, hoursOfShift, selectableHours, shiftForHour } from "@/lib/time";
 import type { Shift } from "@/lib/types";
@@ -17,6 +17,7 @@ import { FieldError, Input, Label, NativeSelect, Textarea } from "@/components/u
 import { Alert } from "@/components/ui/alert";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ComponentPicker, type PickerComponent } from "@/components/component-picker";
+import { Avatar } from "@/components/avatar";
 import { submitEntry } from "./actions";
 
 type FormIn = z.input<typeof entrySchema>;
@@ -33,6 +34,9 @@ interface Existing {
 }
 
 interface Props {
+  operatorId: string;
+  /** profile id → photo version, for avatars */
+  photos: Record<string, number>;
   operatorName: string;
   operatorCode: string | null;
   isOperator: boolean;
@@ -207,7 +211,7 @@ export function EntryForm(props: Props) {
         <Card className="space-y-4 p-4">
           {isOperator ? (
             <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-full bg-brand-50 text-brand"><User className="size-5" /></span>
+              <Avatar id={props.operatorId} name={props.operatorName} version={props.photos[props.operatorId]} size={48} />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Operator</p>
                 <p className="truncate font-semibold text-navy-900">
@@ -241,6 +245,15 @@ export function EntryForm(props: Props) {
                   </NativeSelect>
                 )}
               />
+              {(() => {
+                const chosen = operators.find((o) => o.id === operatorId);
+                return chosen ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    <Avatar id={chosen.id} name={chosen.display_name} version={props.photos[chosen.id]} size={40} />
+                    <span className="text-sm font-semibold text-navy-900">{chosen.display_name}</span>
+                  </div>
+                ) : null;
+              })()}
               <p className="text-xs text-muted">You are recording on behalf of this operator; you are logged as “entered by”.</p>
             </div>
           )}
