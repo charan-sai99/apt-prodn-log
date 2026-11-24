@@ -1,7 +1,7 @@
 "use client";
 import { useActionState } from "react";
 import { Loader2, LogIn } from "lucide-react";
-import { signIn, type FormState } from "../actions";
+import { signIn, type FormState } from "../../actions";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -12,8 +12,8 @@ export function LoginForm({ next }: { next: string }) {
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
       <div className="space-y-1.5">
-        <Label htmlFor="identifier">Employee code or email</Label>
-        <Input id="identifier" name="identifier" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required className="h-12" />
+        <Label htmlFor="identifier">Email</Label>
+        <Input id="identifier" name="identifier" type="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required className="h-12" />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="password">Password</Label>

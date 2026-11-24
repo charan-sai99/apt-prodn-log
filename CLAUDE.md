@@ -37,6 +37,7 @@ npm test               # unit tests (vitest, tests/unit)
 npm run test:db        # needs PG_TEST_URL=postgres://postgres@localhost:5432/postgres (LOCAL Postgres 16 only)
 npm run build
 npm run import:data -- production-list --file APT_ProdnList.xlsx   # regenerate component SQL from Excel
+npm run import:team -- --dir E:\APT_2026\team\app-import       # add team + photos (dry run; --apply --project-ref <ref>)
 ```
 
 ## Stack
@@ -71,8 +72,15 @@ legacy/streamlit/           original app — do not modify
 - Roles in `public.profiles.role`: `operator | supervisor | admin` (+ `customer`, which belongs to the
   separate APT Stock Portal app that shares this Supabase project and `profiles` table — customers get no
   Production Log access). Role is always read from the DB, never from the browser.
-- Operators sign in with an employee code → mapped to `<code>@operators.apt.internal` (`OPERATOR_LOGIN_DOMAIN`).
-  Supervisors/admins use email.
+- **Sign-in (since 0007):** operators and supervisors tap their photo on `/login` and enter a 4-digit PIN that
+  only an admin sets (`set_profile_pin`). The server checks it with `verify_profile_pin` (service_role only;
+  5 wrong → 15 min lock, 10 → admin unlock) and mints a normal Supabase session via
+  `auth.admin.generateLink(magiclink)` + `verifyOtp` (`pinSignIn` in `src/app/(auth)/actions.ts`), so RLS is unchanged.
+  Their auth emails are internal (`<code>@operators.apt.internal`) with random passwords nobody knows.
+  **Admins only** use email + password at `/login/admin` (that form refuses non-admins).
+  Photos: `profile_photos` (base64 JPEG 320px), served publicly by `/api/avatar/[id]`; PIN hashes in
+  `profile_pins` (no grants to app users). Operators/supervisors are signed out after 10 min idle (`IdleSignOut`).
+  The owner chose to show the photo screen on any device (not only registered factory devices).
 - Machines: VIM1–VIM4, HIM. Operators may only log on machines assigned to them (`machine_assignments`).
   Supervisors and admins can assign (migration 0004).
 - Components: the 24 moulded child parts with `raw_material` are active; ~246 old Zoho items are inactive (kept
@@ -96,6 +104,7 @@ legacy/streamlit/           original app — do not modify
 | 0004 supervisor assignments | SQL given to owner 21 Nov — confirm |
 | 0005 raw_material + `seed/production_components.sql` | SQL given 23 Nov — confirm (app falls back if missing) |
 | 0006 `apply_production_list` (Excel upload) | SQL given 23 Nov — confirm |
+| 0007 photo + PIN sign-in | SQL given 25 Nov — confirm; then `npm run import:team` (pack in `E:\APT_2026\team\app-import`) |
 
 Quick check in SQL editor: `select column_name from information_schema.columns where table_name='components' and column_name='raw_material';`
 and `select proname from pg_proc where proname in ('apply_production_list');`

@@ -8,6 +8,9 @@ export interface Profile {
   role: Role | "customer";
   is_active: boolean;
   created_at: string;
+  designation?: string | null;
+  display_order?: number;
+  show_on_login?: boolean;
 }
 
 export interface Machine {

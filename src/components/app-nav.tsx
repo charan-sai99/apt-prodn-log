@@ -33,9 +33,10 @@ interface Props {
   userName: string;
   roleLabel: string;
   signOut: () => Promise<void>;
+  exitLabel?: string;
 }
 
-export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
+export function Sidebar({ items, userName, roleLabel, signOut, exitLabel = "Sign out" }: Props) {
   const pathname = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col bg-navy-900 text-slate-200 lg:flex">
@@ -66,7 +67,7 @@ export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
         <p className="text-xs text-slate-400">{roleLabel}</p>
         <form action={signOut} className="mt-3">
           <button className="flex items-center gap-2 text-sm text-slate-300 hover:text-white" type="submit">
-            <LogOut className="size-4" /> Sign out
+            <LogOut className="size-4" /> {exitLabel}
           </button>
         </form>
       </div>
@@ -74,7 +75,7 @@ export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
   );
 }
 
-export function MobileNav({ items, userName, roleLabel, signOut }: Props) {
+export function MobileNav({ items, userName, roleLabel, signOut, exitLabel = "Sign out" }: Props) {
   const pathname = usePathname();
   // The sheet belongs to the page it was opened on, so it closes by itself
   // as soon as navigation lands on a new page.
@@ -136,7 +137,7 @@ export function MobileNav({ items, userName, roleLabel, signOut }: Props) {
               </ul>
               <form action={signOut} className="mt-4 border-t border-line pt-4">
                 <button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 font-medium text-danger hover:bg-danger-50">
-                  <LogOut className="size-5" /> Sign out
+                  <LogOut className="size-5" /> {exitLabel}
                 </button>
               </form>
             </DialogContent>
