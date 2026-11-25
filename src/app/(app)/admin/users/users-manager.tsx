@@ -36,13 +36,29 @@ interface Props {
 
 export function UsersManager({ users, machinesByUser, pinByUser, photoByUser, currentUserId, pinsEnabled }: Props) {
   const [filter, setFilter] = useState("");
-  const shown = users.filter((u) =>
-    `${u.display_name} ${u.employee_code ?? ""} ${u.role} ${u.designation ?? ""}`.toLowerCase().includes(filter.toLowerCase()),
+  const [showInactive, setShowInactive] = useState(false);
+  const inactiveCount = users.filter((u) => !u.is_active).length;
+  const shown = users.filter(
+    (u) =>
+      (showInactive || u.is_active) &&
+      `${u.display_name} ${u.employee_code ?? ""} ${u.role} ${u.designation ?? ""}`.toLowerCase().includes(filter.toLowerCase()),
   );
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search people" className="max-w-xs" aria-label="Search people" />
+        <div className="flex flex-wrap items-center gap-3">
+          <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search people" className="max-w-xs" aria-label="Search people" />
+          {inactiveCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowInactive((v) => !v)}
+              aria-pressed={showInactive}
+              className="text-sm font-medium text-muted underline-offset-2 hover:text-navy-900 hover:underline"
+            >
+              {showInactive ? "Hide deactivated" : `Show deactivated (${inactiveCount})`}
+            </button>
+          )}
+        </div>
         <CreateUserDialog pinsEnabled={pinsEnabled} />
       </div>
       <Table>
