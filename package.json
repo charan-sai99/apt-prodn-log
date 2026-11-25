@@ -16,7 +16,8 @@
     "test:db": "vitest run --config vitest.db.config.mts",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "import:data": "tsx scripts/migrate/index.ts",
-    "import:team": "tsx scripts/team-import.ts"
+    "import:team": "tsx scripts/team-import.ts",
+    "check:keys": "node scripts/check-keys.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
