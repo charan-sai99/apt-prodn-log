@@ -7,6 +7,9 @@ import { Alert } from "@/components/ui/alert";
 import type { CorrectionRequest, EntryRow, Machine } from "@/lib/types";
 import { EntryForm } from "./entry-form";
 import { TodayRecords } from "./today-records";
+
+/** Earliest date supervisors/admins can pick when filling in old production. */
+const STAFF_MIN_DATE = "2024-01-01";
 import { getPhotoVersions } from "@/lib/photo-versions";
 
 export const metadata: Metadata = { title: "Log production" };
@@ -23,6 +26,8 @@ export default async function EntryPage() {
     getComponents(supabase),
   ]);
   const isOperator = profile.role === "operator";
+  // Supervisors and admins may record any past date (the database allows it);
+  // operators are limited by Settings → "Operator back-dating (days)".
 
   const now = factoryNow(settings.timezone);
   const allowedDates = isOperator
@@ -106,6 +111,7 @@ export default async function EntryPage() {
         components={components.map((c) => ({ id: c.id, component_name: c.component_name, component_code: c.component_code, raw_material: c.raw_material }))}
         shifts={shifts}
         allowedDates={allowedDates}
+        minDate={isOperator ? allowedDates[allowedDates.length - 1]! : STAFF_MIN_DATE}
         timezone={settings.timezone}
         maxQuantity={settings.max_quantity_per_entry}
         existing={entries.map((e) => ({
