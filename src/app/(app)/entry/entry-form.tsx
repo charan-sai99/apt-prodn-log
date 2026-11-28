@@ -6,7 +6,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { CheckCircle2, ClipboardCheck, Factory, Loader2, Send } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardCheck, Factory, Loader2, Send } from "lucide-react";
 import { entrySchema } from "@/lib/validation";
 import { factoryNow, formatDisplayDate, formatHourSlot, hoursOfShift, selectableHours, shiftForHour } from "@/lib/time";
 import type { Shift } from "@/lib/types";
@@ -44,7 +44,10 @@ interface Props {
   operators: { id: string; display_name: string; employee_code: string | null; machineIds: string[] }[];
   components: PickerComponent[];
   shifts: Shift[];
+  /** Today first, then the back-dated days (shown as quick chips: Today, Yesterday). */
   allowedDates: string[];
+  /** Earliest date the "Other date" picker allows (operators: their back-dating limit). */
+  minDate: string;
   timezone: string;
   maxQuantity: number;
   existing: Existing[];
@@ -72,7 +75,10 @@ function useFactoryClock(timezone: string) {
 }
 
 export function EntryForm(props: Props) {
-  const { machines, components, shifts, allowedDates, timezone, existing, isOperator, operators } = props;
+  const { machines, components, shifts, allowedDates, minDate, timezone, existing, isOperator, operators } = props;
+  const quickDates = allowedDates.slice(0, 2);
+  const today = allowedDates[0]!;
+  const canPickOther = minDate < (quickDates[quickDates.length - 1] ?? today);
   const router = useRouter();
   const clock = useFactoryClock(timezone);
   const submitting = useRef(false);
@@ -316,8 +322,8 @@ export function EntryForm(props: Props) {
               control={control}
               name="productionDate"
               render={({ field }) => (
-                <div role="radiogroup" aria-labelledby="date-label" className="flex gap-2 overflow-x-auto">
-                  {allowedDates.map((d, i) => (
+                <div role="radiogroup" aria-labelledby="date-label" className="flex flex-wrap gap-2">
+                  {quickDates.map((d, i) => (
                     <button
                       key={d}
                       type="button"
@@ -329,9 +335,32 @@ export function EntryForm(props: Props) {
                         field.value === d ? "border-navy-900 bg-navy-900 text-white" : "border-line bg-surface text-navy-900",
                       )}
                     >
-                      {i === 0 ? "Today" : i === 1 ? "Yesterday" : formatDisplayDate(d).slice(0, 10)}
+                      {i === 0 ? "Today" : "Yesterday"}
                     </button>
                   ))}
+                  {canPickOther && (
+                    <label
+                      className={cn(
+                        "flex min-h-12 items-center gap-2 rounded-lg border px-3 text-sm font-semibold",
+                        !quickDates.includes(field.value) ? "border-navy-900 bg-navy-900 text-white" : "border-line bg-surface text-navy-900",
+                      )}
+                    >
+                      <CalendarDays className="size-4 shrink-0" aria-hidden />
+                      <span className="sr-only">Other date</span>
+                      <input
+                        type="date"
+                        min={minDate}
+                        max={today}
+                        value={quickDates.includes(field.value) ? "" : field.value}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v && v >= minDate && v <= today) field.onChange(v);
+                        }}
+                        aria-label="Other date"
+                        className={cn("min-w-0 bg-transparent font-semibold outline-none", quickDates.includes(field.value) ? "[color-scheme:light]" : "[color-scheme:dark]")}
+                      />
+                    </label>
+                  )}
                 </div>
               )}
             />
