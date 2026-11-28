@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { getPublicSupabaseEnv } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth", "/setup", "/offline"];
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth", "/setup", "/offline", "/api/avatar"];
 
 /**
  * Refreshes the Supabase session cookie on every request and sends signed-out

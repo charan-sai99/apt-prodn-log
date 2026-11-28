@@ -61,10 +61,11 @@ describe("correction & review schemas", () => {
 });
 
 describe("admin schemas", () => {
-  it("requires email for supervisors and admins only", () => {
+  it("requires email and password for admins only", () => {
     const u = { displayName: "Ravi Kumar", employeeCode: "OP14", password: "longenough" };
     expect(createUserSchema.safeParse({ ...u, role: "operator", email: "" }).success).toBe(true);
-    expect(createUserSchema.safeParse({ ...u, role: "supervisor", email: "" }).success).toBe(false);
+    expect(createUserSchema.safeParse({ ...u, role: "supervisor", email: "" }).success).toBe(true);
+    expect(createUserSchema.safeParse({ ...u, role: "admin", email: "" }).success).toBe(false);
     expect(createUserSchema.safeParse({ ...u, role: "admin", email: "a@b.co" }).success).toBe(true);
   });
   it("rejects roles that do not exist (no browser-supplied role escalation)", () => {

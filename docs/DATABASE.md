@@ -33,6 +33,12 @@ If those migrations were applied, the project contains:
 ### `20261123000005_component_raw_material.sql`
 - Adds `components.raw_material` and exposes it in `production_entries_enriched`. Production components no longer need a Zoho Item ID; the name is the key.
 
+### `20261125000007_photo_pin_login.sql`
+- Photo + 4-digit PIN sign-in for operators and supervisors; administrators keep email + password.
+- `profiles` + `designation`, `display_order`, `show_on_login`. New tables `profile_pins` (bcrypt hash, lockout) and
+  `profile_photos`, with no access for app users. Admin-only functions to set/unlock/remove PINs and photos;
+  `verify_profile_pin`, `login_roster` and `get_profile_photo` can only be called by the server (secret key).
+
 ### `20261123000006_apply_production_list.sql`
 - Function `apply_production_list(items, hide_others)` behind **Admin → Components → Upload production list**. In one transaction it adds new parts, updates names and raw materials, re-activates listed parts, and optionally hides parts that are not in the file. It is admin-only, audited and deletes nothing.
 
@@ -55,7 +61,7 @@ All files are re-runnable, and none of them drops data. They were applied twice 
 ## 4. How to apply (after approval)
 
 1. Back up: Supabase Dashboard → Database → Backups. Or `pg_dump`.
-2. SQL editor → paste and run each migration file **in order** (0001 → 0006). Or with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.
+2. SQL editor → paste and run each migration file **in order** (0001 → 0007). Or with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.
 3. Run `supabase/seed/components_seed.sql`. It adds 246 components: 235 active goods and 11 Zoho service items set inactive.
 4. Check: `select machine_code from machines;` returns 5 rows; `select count(*) from components;` returns 246.
 

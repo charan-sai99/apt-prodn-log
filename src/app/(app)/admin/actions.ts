@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
@@ -8,7 +9,7 @@ import { getSession } from "@/lib/auth";
 import { friendlyDbError } from "@/lib/errors";
 import { DEFAULT_OPERATOR_LOGIN_DOMAIN, isOperatorLoginEmail, toLoginEmail } from "@/lib/login-id";
 import {
-  componentSchema, createUserSchema, employeeCodeSchema, fieldErrors, machineSchema, passwordSchema, roleSchema, shiftSchema,
+  codeFromName, componentSchema, createUserSchema, pinSchema, employeeCodeSchema, fieldErrors, machineSchema, passwordSchema, roleSchema, shiftSchema,
 } from "@/lib/validation";
 import type { ActionResult } from "@/lib/types";
 
@@ -43,16 +44,29 @@ export async function createUser(input: unknown): Promise<ActionResult> {
   const parsed = createUserSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Please check the form.", fieldErrors: fieldErrors(parsed.error) };
   const v = parsed.data;
-  const email = v.email ? v.email.toLowerCase() : toLoginEmail(v.employeeCode, domain());
-  if (!email) return { ok: false, error: "Invalid employee code." };
-
   const supabase = await createClient();
-  const { data: clash } = await supabase.from("profiles").select("id").ilike("employee_code", v.employeeCode).maybeSingle();
-  if (clash) return { ok: false, error: "That employee code is already in use.", fieldErrors: { employeeCode: "Already in use" } };
+
+  // Employee code: given, or made from the first name (made unique).
+  let code = v.employeeCode || codeFromName(v.displayName);
+  if (!v.employeeCode) {
+    const { data: taken } = await supabase.from("profiles").select("employee_code").ilike("employee_code", `${code}%`);
+    const used = new Set((taken ?? []).map((t) => String(t.employee_code).toUpperCase()));
+    for (let i = 2; used.has(code.toUpperCase()); i++) code = `${codeFromName(v.displayName)}${i}`;
+  } else {
+    const { data: clash } = await supabase.from("profiles").select("id").ilike("employee_code", code).maybeSingle();
+    if (clash) return { ok: false, error: "That employee code is already in use.", fieldErrors: { employeeCode: "Already in use" } };
+  }
+
+  // Operators and supervisors sign in with photo + PIN; their account gets an
+  // internal address and a random password nobody knows.
+  const isAdmin = v.role === "admin";
+  const email = isAdmin ? v.email!.toLowerCase() : toLoginEmail(code, domain());
+  if (!email) return { ok: false, error: "Invalid employee code." };
+  const password = isAdmin ? v.password! : randomBytes(24).toString("base64url");
 
   const admin = createAdminClient();
   const { data: created, error } = await admin.auth.admin.createUser({
-    email, password: v.password, email_confirm: true, user_metadata: { display_name: v.displayName },
+    email, password, email_confirm: true, user_metadata: { display_name: v.displayName },
   });
   if (error || !created.user) {
     return { ok: false, error: /already/i.test(error?.message ?? "") ? "An account with that login already exists." : "Could not create the account." };
@@ -60,15 +74,76 @@ export async function createUser(input: unknown): Promise<ActionResult> {
 
   // Profile written with the admin's own session so RLS and the audit trigger apply.
   const { error: pErr } = await supabase.from("profiles").insert({
-    id: created.user.id, display_name: v.displayName, employee_code: v.employeeCode, role: v.role, is_active: true,
+    id: created.user.id, display_name: v.displayName, employee_code: code, role: v.role, is_active: true,
+    ...(v.designation ? { designation: v.designation } : {}),
   });
   if (pErr) {
     await admin.auth.admin.deleteUser(created.user.id); // brand-new, no history: safe to roll back
     return { ok: false, error: friendlyDbError(pErr) };
   }
   await auditAuth(session.userId, created.user.id, "account_created", { email, role: v.role });
+  if (!isAdmin && v.pin) {
+    const { error: pinErr } = await supabase.rpc("set_profile_pin", { p_profile_id: created.user.id, p_pin: v.pin });
+    if (pinErr) return { ok: true, message: `Account created, but the PIN could not be set: ${friendlyDbError(pinErr)}` };
+  }
   revalidatePath("/admin/users");
-  return { ok: true, message: `Account created. ${v.role === "operator" && !v.email ? `Login: ${v.employeeCode}` : `Login: ${email}`}` };
+  return { ok: true, message: isAdmin ? `Account created. Login: ${email}` : `${v.displayName} added${v.pin ? " with PIN" : " — set a PIN to let them sign in"}.` };
+}
+
+// ------------------------------------------------------------------ PIN & photo (operators / supervisors)
+export async function setPin(userId: string, pin: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return DENIED;
+  if (!uuid.safeParse(userId).success || !pinSchema.safeParse(pin).success) return { ok: false, error: "The PIN must be exactly 4 digits." };
+  const { error } = await (await createClient()).rpc("set_profile_pin", { p_profile_id: userId, p_pin: pin });
+  if (error) return { ok: false, error: friendlyDbError(error) };
+  revalidatePath("/admin/users");
+  return { ok: true, message: "PIN saved. Tell the person in private." };
+}
+
+export async function unlockPin(userId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return DENIED;
+  if (!uuid.safeParse(userId).success) return { ok: false, error: "Invalid user." };
+  const { error } = await (await createClient()).rpc("unlock_profile_pin", { p_profile_id: userId });
+  if (error) return { ok: false, error: friendlyDbError(error) };
+  revalidatePath("/admin/users");
+  return { ok: true, message: "Unlocked" };
+}
+
+export async function clearPin(userId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return DENIED;
+  if (!uuid.safeParse(userId).success) return { ok: false, error: "Invalid user." };
+  const { error } = await (await createClient()).rpc("clear_profile_pin", { p_profile_id: userId });
+  if (error) return { ok: false, error: friendlyDbError(error) };
+  revalidatePath("/admin/users");
+  return { ok: true, message: "PIN removed — this person cannot sign in until a new PIN is set." };
+}
+
+const photoSchema = z.object({
+  userId: z.uuid(),
+  contentType: z.enum(["image/jpeg", "image/webp", "image/png"]),
+  dataBase64: z.string().min(100).max(400_000).regex(/^[A-Za-z0-9+/=]+$/),
+});
+
+export async function setPhoto(input: unknown): Promise<ActionResult> {
+  if (!(await requireAdmin())) return DENIED;
+  const p = photoSchema.safeParse(input);
+  if (!p.success) return { ok: false, error: "The photo could not be read. Try a different picture." };
+  const { error } = await (await createClient()).rpc("set_profile_photo", {
+    p_profile_id: p.data.userId, p_content_type: p.data.contentType, p_data_base64: p.data.dataBase64,
+  });
+  if (error) return { ok: false, error: friendlyDbError(error) };
+  revalidatePath("/admin/users");
+  revalidatePath("/login");
+  return { ok: true, message: "Photo saved" };
+}
+
+export async function clearPhoto(userId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return DENIED;
+  if (!uuid.safeParse(userId).success) return { ok: false, error: "Invalid user." };
+  const { error } = await (await createClient()).rpc("clear_profile_photo", { p_profile_id: userId });
+  if (error) return { ok: false, error: friendlyDbError(error) };
+  revalidatePath("/admin/users");
+  return { ok: true, message: "Photo removed" };
 }
 
 export async function setUserActive(userId: string, active: boolean): Promise<ActionResult> {
@@ -94,6 +169,12 @@ export async function changeRole(userId: string, role: string): Promise<ActionRe
   const r = roleSchema.safeParse(role);
   if (!r.success || !uuid.safeParse(userId).success) return { ok: false, error: "Invalid role." };
   const supabase = await createClient();
+  if (r.data === "admin" && hasAdminKey()) {
+    const { data: u } = await createAdminClient().auth.admin.getUserById(userId);
+    if (!u.user?.email || isOperatorLoginEmail(u.user.email, domain())) {
+      return { ok: false, error: "Administrators sign in with a real email and password. Create a separate administrator account for this person instead." };
+    }
+  }
   if (r.data !== "operator") {
     const { data: asg } = await supabase.from("machine_assignments").select("id").eq("operator_id", userId).eq("is_active", true);
     if (asg && asg.length) return { ok: false, error: "Remove this user's machine assignments before changing them from operator." };
@@ -107,15 +188,27 @@ export async function changeRole(userId: string, role: string): Promise<ActionRe
 export async function updateUserDetails(input: unknown): Promise<ActionResult> {
   const session = await requireAdmin();
   if (!session) return DENIED;
-  const parsed = z.object({ userId: uuid, displayName: z.string().trim().min(2).max(80), employeeCode: employeeCodeSchema }).safeParse(input);
+  const parsed = z.object({
+    userId: uuid,
+    displayName: z.string().trim().min(2).max(80),
+    employeeCode: employeeCodeSchema,
+    designation: z.string().trim().max(60).optional(),
+    displayOrder: z.coerce.number().int().min(0).max(9999).optional(),
+    showOnLogin: z.boolean().optional(),
+  }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Please check the form.", fieldErrors: fieldErrors(parsed.error) };
   const v = parsed.data;
   const supabase = await createClient();
   const { data: before } = await supabase.from("profiles").select("employee_code").eq("id", v.userId).maybeSingle<{ employee_code: string | null }>();
-  const { error } = await supabase.from("profiles").update({ display_name: v.displayName, employee_code: v.employeeCode }).eq("id", v.userId);
+  const { error } = await supabase.from("profiles").update({
+    display_name: v.displayName, employee_code: v.employeeCode,
+    ...(v.designation !== undefined ? { designation: v.designation || null } : {}),
+    ...(v.displayOrder !== undefined ? { display_order: v.displayOrder } : {}),
+    ...(v.showOnLogin !== undefined ? { show_on_login: v.showOnLogin } : {}),
+  }).eq("id", v.userId);
   if (error) return { ok: false, error: friendlyDbError(error) };
 
-  // Operators sign in with their code: keep the internal login address in step.
+  // Keep the internal login address in step with the employee code.
   if (before?.employee_code?.toLowerCase() !== v.employeeCode.toLowerCase() && hasAdminKey()) {
     const admin = createAdminClient();
     const { data: u } = await admin.auth.admin.getUserById(v.userId);
@@ -124,6 +217,7 @@ export async function updateUserDetails(input: unknown): Promise<ActionResult> {
     }
   }
   revalidatePath("/admin/users");
+  revalidatePath("/login");
   return { ok: true, message: "Details saved" };
 }
 

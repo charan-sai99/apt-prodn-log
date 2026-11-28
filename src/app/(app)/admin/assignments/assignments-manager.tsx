@@ -2,15 +2,17 @@
 import { Card } from "@/components/ui/card";
 import { EmptyRow, Table, TD, TH, THead } from "@/components/ui/table";
 import { useAction } from "@/components/use-action";
+import { Avatar } from "@/components/avatar";
 import { cn } from "@/lib/utils";
 import { assignMachine, unassignMachine } from "../actions";
 
 export function AssignmentsManager({
-  machines, operators, assignments,
+  machines, operators, assignments, photoByUser = {},
 }: {
   machines: { id: string; code: string }[];
   operators: { id: string; display_name: string; employee_code: string | null }[];
   assignments: { id: string; operator_id: string; machine_id: string }[];
+  photoByUser?: Record<string, number>;
 }) {
   const { pending, run } = useAction();
   return (
@@ -21,7 +23,12 @@ export function AssignmentsManager({
           {operators.length === 0 && <EmptyRow colSpan={machines.length + 1}>No active operators. Create operator accounts under Users first.</EmptyRow>}
           {operators.map((o) => (
             <tr key={o.id}>
-              <TD className="whitespace-nowrap font-semibold">{o.display_name}<span className="block text-xs font-normal text-muted">{o.employee_code}</span></TD>
+              <TD className="whitespace-nowrap font-semibold">
+                <div className="flex items-center gap-3">
+                  <Avatar id={o.id} name={o.display_name} version={photoByUser[o.id]} size={40} />
+                  <span>{o.display_name}<span className="block text-xs font-normal text-muted">{o.employee_code}</span></span>
+                </div>
+              </TD>
               {machines.map((m) => {
                 const a = assignments.find((x) => x.operator_id === o.id && x.machine_id === m.id);
                 return (

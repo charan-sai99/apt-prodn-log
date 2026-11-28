@@ -6,7 +6,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { CheckCircle2, ClipboardCheck, Factory, Loader2, Send, User } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Factory, Loader2, Send } from "lucide-react";
 import { entrySchema } from "@/lib/validation";
 import { factoryNow, formatDisplayDate, formatHourSlot, hoursOfShift, selectableHours, shiftForHour } from "@/lib/time";
 import type { Shift } from "@/lib/types";
@@ -17,6 +17,7 @@ import { FieldError, Input, Label, NativeSelect, Textarea } from "@/components/u
 import { Alert } from "@/components/ui/alert";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ComponentPicker, type PickerComponent } from "@/components/component-picker";
+import { Avatar } from "@/components/avatar";
 import { submitEntry } from "./actions";
 
 type FormIn = z.input<typeof entrySchema>;
@@ -33,6 +34,9 @@ interface Existing {
 }
 
 interface Props {
+  operatorId: string;
+  /** profile id → photo version, for avatars */
+  photos: Record<string, number>;
   operatorName: string;
   operatorCode: string | null;
   isOperator: boolean;
@@ -46,7 +50,16 @@ interface Props {
   existing: Existing[];
 }
 
-const newRequestId = () => crypto.randomUUID();
+// crypto.randomUUID only exists on https/localhost; testing from a phone over plain
+// http (Wi-Fi/Tailscale address) needs the getRandomValues fallback.
+const newRequestId = (): string => {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6]! & 0x0f) | 0x40;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
 
 /** Ticks every 30 s so the hour grid unlocks the new hour without a reload. */
 function useFactoryClock(timezone: string) {
@@ -207,7 +220,7 @@ export function EntryForm(props: Props) {
         <Card className="space-y-4 p-4">
           {isOperator ? (
             <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-full bg-brand-50 text-brand"><User className="size-5" /></span>
+              <Avatar id={props.operatorId} name={props.operatorName} version={props.photos[props.operatorId]} size={48} />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Operator</p>
                 <p className="truncate font-semibold text-navy-900">
@@ -241,6 +254,15 @@ export function EntryForm(props: Props) {
                   </NativeSelect>
                 )}
               />
+              {(() => {
+                const chosen = operators.find((o) => o.id === operatorId);
+                return chosen ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    <Avatar id={chosen.id} name={chosen.display_name} version={props.photos[chosen.id]} size={40} />
+                    <span className="text-sm font-semibold text-navy-900">{chosen.display_name}</span>
+                  </div>
+                ) : null;
+              })()}
               <p className="text-xs text-muted">You are recording on behalf of this operator; you are logged as “entered by”.</p>
             </div>
           )}

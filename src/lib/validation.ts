@@ -63,18 +63,33 @@ export const passwordSchema = z
 
 export const roleSchema = z.enum(["operator", "supervisor", "admin"]);
 
+export const pinSchema = z.string().regex(/^[0-9]{4}$/, "Exactly 4 digits");
+
 export const createUserSchema = z
   .object({
     displayName: z.string().trim().min(2, "Enter the full name").max(80),
-    employeeCode: employeeCodeSchema,
+    employeeCode: z.union([employeeCodeSchema, z.literal("")]).optional(),
+    designation: z.string().trim().max(60).optional(),
     role: roleSchema,
     email: z.union([z.email("Enter a valid email"), z.literal("")]).optional(),
-    password: passwordSchema,
+    password: z.union([passwordSchema, z.literal("")]).optional(),
+    pin: z.union([pinSchema, z.literal("")]).optional(),
   })
-  .refine((v) => v.role === "operator" || (v.email ?? "") !== "", {
-    message: "Supervisors and administrators need an email address (for password reset)",
+  .refine((v) => v.role !== "admin" || (v.email ?? "") !== "", {
+    message: "Administrators need an email address",
     path: ["email"],
+  })
+  .refine((v) => v.role !== "admin" || (v.password ?? "") !== "", {
+    message: "Administrators need a password",
+    path: ["password"],
   });
+
+/** Default employee code from a name: first word, letters/digits only, upper case. */
+export function codeFromName(name: string): string {
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  const code = first.normalize("NFKD").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 12);
+  return code.length >= 2 ? code : `EMP${code}`;
+}
 
 export const machineSchema = z.object({
   id: z.uuid().optional(),

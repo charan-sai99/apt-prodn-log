@@ -1,9 +1,17 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { componentsSeedSql, importKey, mapComponents, mapProduction, mapProductionList, parseCsv, parseLogLines, productionListSql, readLegacyCsv, type ComponentLookup } from "../../scripts/migrate/core";
+
+// Works the same on Windows and Linux: run the scripts with this Node + the local tsx,
+// and find a Python that has pandas (the legacy-storage test needs it; skipped if none).
+const runTsx = (args: string[], cwd: string) =>
+  execFileSync(process.execPath, [path.resolve("node_modules/tsx/dist/cli.mjs"), ...args], { cwd, encoding: "utf8" });
+const python = ["python3", "python", "py"].find(
+  (cmd) => spawnSync(cmd, ["-c", "import pandas"], { stdio: "ignore", shell: process.platform === "win32" }).status === 0,
+);
 
 describe("component master mapping", () => {
   const master = [
@@ -70,13 +78,13 @@ describe("legacy production mapping", () => {
     expect(mapProduction(bad.rows, [], comps).issues.map((i) => i.code)).toEqual(["BAD_DATETIME", "BAD_QUANTITY"]);
   });
 
-  it("end-to-end dry run on a storage folder written by the legacy app's own code", () => {
+  it.skipIf(!python)("end-to-end dry run on a storage folder written by the legacy app's own code (needs Python + pandas)", () => {
     const tmp = mkdtempSync(path.join(tmpdir(), "legacy-"));
     const storage = path.join(tmp, "storage");
-    execFileSync("python3", [path.resolve("tests/fixtures/make_legacy_storage.py"), storage]);
+    execFileSync(python!, [path.resolve("tests/fixtures/make_legacy_storage.py"), storage], { shell: process.platform === "win32" });
     const master = path.resolve(tmp, "master.xlsx");
-    execFileSync("cp", [path.resolve("legacy/streamlit/data/APT_Production_Master.xlsx"), master]);
-    const out = execFileSync("npx", ["tsx", path.resolve("scripts/migrate/index.ts"), "production", "--storage", storage, "--master", master, "--env", "/nonexistent"], { cwd: tmp, encoding: "utf8" });
+    copyFileSync(path.resolve("legacy/streamlit/data/APT_Production_Master.xlsx"), master);
+    const out = runTsx([path.resolve("scripts/migrate/index.ts"), "production", "--storage", storage, "--master", master, "--env", "/nonexistent"], tmp);
     expect(out).toContain("DRY RUN");
     expect(out).toContain("CSV rows: 10 · ready: 4 · blocked: 6");
     const reportDir = /Report:\s+(\S+)/.exec(out)![1]!;
@@ -116,7 +124,7 @@ describe("production component list (independent of Zoho)", () => {
   });
   it("reads the real APT production list workbook", () => {
     const tmp = mkdtempSync(path.join(tmpdir(), "plist-"));
-    const out = execFileSync("npx", ["tsx", path.resolve("scripts/migrate/index.ts"), "production-list", "--file", path.resolve("tests/fixtures/APT_ProdnList.xlsx"), "--env", "/nonexistent"], { cwd: tmp, encoding: "utf8" });
+    const out = runTsx([path.resolve("scripts/migrate/index.ts"), "production-list", "--file", path.resolve("tests/fixtures/APT_ProdnList.xlsx"), "--env", "/nonexistent"], tmp);
     expect(out).toContain("Production components ready: 24");
     expect(out).toContain("rejected: 0");
   }, 60000);

@@ -2,6 +2,7 @@ import { Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CorrectionDialog } from "@/components/correction-dialog";
+import { PersonName } from "@/components/avatar";
 import { formatDisplayDate, formatHourSlot } from "@/lib/time";
 import type { Component, CorrectionRequest, EntryRow } from "@/lib/types";
 import { formatQty } from "@/lib/utils";
@@ -11,11 +12,13 @@ export function TodayRecords({
   pendingByEntry,
   components,
   today,
+  photos = {},
 }: {
   entries: EntryRow[];
   pendingByEntry: Record<string, CorrectionRequest>;
   components: Pick<Component, "id" | "component_name" | "component_code" | "raw_material">[];
   today: string;
+  photos?: Record<string, number>;
 }) {
   const dates = [...new Set(entries.map((e) => e.production_date))].sort().reverse();
   const todayTotal = entries.filter((e) => e.production_date === today && e.status === "active").reduce((s, e) => s + e.quantity, 0);
@@ -55,7 +58,10 @@ export function TodayRecords({
                           </p>
                           <p className="truncate font-semibold text-navy-900">{e.component_name}</p>
                           {e.operator_name && e.entered_by !== e.operator_id && (
-                            <p className="text-xs text-muted">Operator: {e.operator_name}</p>
+                            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                              Operator:
+                              <PersonName id={e.operator_id} name={e.operator_name} version={e.operator_id ? photos[e.operator_id] : null} size={22} />
+                            </p>
                           )}
                         </div>
                         <p className={`shrink-0 text-lg font-bold tabular ${e.status === "voided" ? "text-slate-400 line-through" : "text-navy-900"}`}>

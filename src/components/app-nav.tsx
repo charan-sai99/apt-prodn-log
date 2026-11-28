@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { Avatar } from "@/components/avatar";
 import {
   Boxes, ClipboardCheck, Factory, FileSpreadsheet, History, LayoutDashboard, Link2,
   Loader2, LogOut, Menu, PlusCircle, ScrollText, Settings, Table2, Users, Wrench,
@@ -33,9 +34,12 @@ interface Props {
   userName: string;
   roleLabel: string;
   signOut: () => Promise<void>;
+  exitLabel?: string;
+  userId: string;
+  photoVersion?: number | null;
 }
 
-export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
+export function Sidebar({ items, userName, roleLabel, signOut, exitLabel = "Sign out", userId, photoVersion }: Props) {
   const pathname = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col bg-navy-900 text-slate-200 lg:flex">
@@ -62,11 +66,16 @@ export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
         })}
       </nav>
       <div className="border-t border-white/10 p-4">
-        <p className="truncate text-sm font-semibold text-white">{userName}</p>
-        <p className="text-xs text-slate-400">{roleLabel}</p>
+        <div className="flex items-center gap-3">
+          <Avatar id={userId} name={userName} version={photoVersion} size={44} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{userName}</p>
+            <p className="text-xs text-slate-400">{roleLabel}</p>
+          </div>
+        </div>
         <form action={signOut} className="mt-3">
           <button className="flex items-center gap-2 text-sm text-slate-300 hover:text-white" type="submit">
-            <LogOut className="size-4" /> Sign out
+            <LogOut className="size-4" /> {exitLabel}
           </button>
         </form>
       </div>
@@ -74,7 +83,7 @@ export function Sidebar({ items, userName, roleLabel, signOut }: Props) {
   );
 }
 
-export function MobileNav({ items, userName, roleLabel, signOut }: Props) {
+export function MobileNav({ items, userName, roleLabel, signOut, exitLabel = "Sign out" }: Omit<Props, "userId" | "photoVersion">) {
   const pathname = usePathname();
   // The sheet belongs to the page it was opened on, so it closes by itself
   // as soon as navigation lands on a new page.
@@ -136,7 +145,7 @@ export function MobileNav({ items, userName, roleLabel, signOut }: Props) {
               </ul>
               <form action={signOut} className="mt-4 border-t border-line pt-4">
                 <button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 font-medium text-danger hover:bg-danger-50">
-                  <LogOut className="size-5" /> Sign out
+                  <LogOut className="size-5" /> {exitLabel}
                 </button>
               </form>
             </DialogContent>

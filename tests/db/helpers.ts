@@ -74,6 +74,23 @@ export class Db {
       client.release();
     }
   }
+  /** Run as the server's secret-key client (Supabase service_role). */
+  async service<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("set local role service_role");
+      await client.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: "service_role" })]);
+      const r = await client.query(sql, params);
+      await client.query("commit");
+      return r.rows as T[];
+    } catch (e) {
+      await client.query("rollback").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
   async end() {
     await this.pool.end();
   }

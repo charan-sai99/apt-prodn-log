@@ -8,6 +8,8 @@ import { CorrectionStatusBadge } from "@/components/correction-status";
 import { LiveRefresh } from "@/components/live-refresh";
 import { cn, formatQty } from "@/lib/utils";
 import type { CorrectionRequest, EntryRow } from "@/lib/types";
+import { Avatar } from "@/components/avatar";
+import { getPhotoVersions } from "@/lib/photo-versions";
 import { ReviewButtons } from "./review-buttons";
 
 export const metadata = { title: "Corrections" };
@@ -25,10 +27,11 @@ export default async function CorrectionsPage({ searchParams }: { searchParams: 
   const entryIds = [...new Set(reqs.map((r) => r.production_entry_id))];
   const people = [...new Set(reqs.flatMap((r) => [r.requested_by, r.reviewed_by]).filter(Boolean))] as string[];
   const comps = [...new Set(reqs.map((r) => r.proposed_component_id).filter(Boolean))] as string[];
-  const [{ data: entries }, { data: profs }, { data: cs }] = await Promise.all([
+  const [{ data: entries }, { data: profs }, { data: cs }, photos] = await Promise.all([
     entryIds.length ? supabase.from("production_entries_enriched").select("*").in("id", entryIds) : Promise.resolve({ data: [] }),
     people.length ? supabase.from("profiles").select("id, display_name").in("id", people) : Promise.resolve({ data: [] }),
     comps.length ? supabase.from("components").select("id, component_name").in("id", comps) : Promise.resolve({ data: [] }),
+    getPhotoVersions(),
   ]);
   const entry = new Map(((entries ?? []) as EntryRow[]).map((e) => [e.id, e]));
   const name = new Map(((profs ?? []) as { id: string; display_name: string }[]).map((p) => [p.id, p.display_name]));
@@ -55,9 +58,10 @@ export default async function CorrectionsPage({ searchParams }: { searchParams: 
                 <div className="flex items-center gap-2"><CorrectionStatusBadge status={r.status} />
                   <span className="text-xs text-muted">{formatTimestamp(r.created_at, settings.timezone)} · by {name.get(r.requested_by) ?? "—"}</span></div>
                 {e && (
-                  <p className="font-semibold text-navy-900">
-                    {e.machine_code} · {e.production_date} · {formatHourSlot(e.hour_slot)} · {e.operator_name ?? "—"}
-                  </p>
+                  <div className="flex items-center gap-2 font-semibold text-navy-900">
+                    {e.operator_id && e.operator_name && <Avatar id={e.operator_id} name={e.operator_name} version={photos[e.operator_id]} size={32} />}
+                    <p>{e.machine_code} · {e.production_date} · {formatHourSlot(e.hour_slot)} · {e.operator_name ?? "—"}</p>
+                  </div>
                 )}
                 <p>{e?.component_name} — <strong className="tabular">{e ? formatQty(e.quantity) : "?"} pcs</strong></p>
                 <p className="rounded-md bg-canvas px-3 py-2">

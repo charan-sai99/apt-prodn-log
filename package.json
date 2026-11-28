@@ -2,7 +2,7 @@
   "name": "apt-production-log",
   "version": "1.0.0",
   "private": true,
-  "description": "APT Production Log — mobile-first hourly production logging for Axis Plastics Transition",
+  "description": "APT Production Log \u2014 mobile-first hourly production logging for Axis Plastics Transition",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:db": "vitest run --config vitest.db.config.mts",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "import:data": "tsx scripts/migrate/index.ts"
+    "import:data": "tsx scripts/migrate/index.ts",
+    "import:team": "tsx scripts/team-import.ts",
+    "check:keys": "node scripts/check-keys.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",

@@ -433,3 +433,83 @@ describe("uploading the production list (apply_production_list)", () => {
     expect(n).toBe(5);
   });
 });
+
+describe("photo + PIN sign-in (0007)", () => {
+  let db: Db;
+  let admin = "", sup = "", op = "", op2 = "", cust = "";
+  const verify = (id: string, pin: string) =>
+    db.service<{ r: { ok: boolean; reason?: string; remaining?: number; role?: string } }>("select verify_profile_pin($1, $2) r", [id, pin]).then((x) => x[0]!.r);
+  beforeAll(async () => {
+    await createTestDatabase("prodlog_test_pin", { withStockPortal: true });
+    db = new Db("prodlog_test_pin", 5);
+    admin = await seedUser(db, "admin", "Admin P", { code: "ADMP" });
+    sup = await seedUser(db, "supervisor", "Vishnu", { code: "VISHNU" });
+    op = await seedUser(db, "operator", "Saroj", { code: "SAROJ" });
+    op2 = await seedUser(db, "operator", "Neeraj", { code: "NEERAJ" });
+    cust = await seedUser(db, "customer", "Shop Customer");
+    await db.owner("update profiles set display_order = 1000, designation = 'Proprietor' where id = $1", [sup]);
+    const [m] = await db.owner<{ id: string }>("select id from machines where machine_code='VIM2'");
+    await db.owner("insert into machine_assignments (operator_id, machine_id) values ($1,$2)", [op, m!.id]);
+  });
+  afterAll(async () => db?.end());
+
+  it("only admins set PINs, PINs are 4 digits, admins cannot get one", async () => {
+    await expectDbError(db.as(sup, "select set_profile_pin($1,'1234')", [op]), "FORBIDDEN");
+    await expectDbError(db.as(op, "select set_profile_pin($1,'1234')", [op]), "FORBIDDEN");
+    await expectDbError(db.as(admin, "select set_profile_pin($1,'12a4')", [op]), "4 digits");
+    await expectDbError(db.as(admin, "select set_profile_pin($1,'12345')", [op]), "4 digits");
+    await expectDbError(db.as(admin, "select set_profile_pin($1,'1234')", [admin]), "password");
+    await db.as(admin, "select set_profile_pin($1,'4821')", [op]);
+    await db.as(admin, "select set_profile_pin($1,'1957')", [sup]);
+  });
+  it("keeps PIN hashes and photos away from every app user", async () => {
+    for (const u of [admin, sup, op]) {
+      await expectDbError(db.as(u, "select * from profile_pins"), "permission denied");
+      await expectDbError(db.as(u, "select * from profile_photos"), "permission denied");
+      await expectDbError(db.as(u, "select verify_profile_pin($1,'4821')", [op]), "permission denied");
+      await expectDbError(db.as(u, "select * from login_roster()"), "permission denied");
+    }
+    await expectDbError(db.as(null, "select verify_profile_pin($1,'4821')", [op]), "permission denied");
+    const [row] = await db.owner<{ pin_hash: string }>("select pin_hash from profile_pins where profile_id=$1", [op]);
+    expect(row!.pin_hash).not.toContain("4821");
+  });
+  it("verifies the right PIN and refuses admins, customers and unknown people", async () => {
+    expect(await verify(op, "4821")).toMatchObject({ ok: true, role: "operator" });
+    expect(await verify(sup, "1957")).toMatchObject({ ok: true, role: "supervisor" });
+    expect((await verify(admin, "1234")).reason).toBe("unavailable");
+    expect((await verify(cust, "1234")).reason).toBe("unavailable");
+    expect((await verify(op2, "1234")).reason).toBe("no_pin");
+  });
+  it("locks for 15 minutes after 5 wrong PINs, then needs an admin after 10", async () => {
+    for (let i = 4; i >= 1; i--) expect(await verify(op, "0000")).toMatchObject({ ok: false, reason: "wrong_pin", remaining: i });
+    expect((await verify(op, "0000")).reason).toBe("locked");
+    expect((await verify(op, "4821")).reason).toBe("locked"); // even the right PIN while locked
+    await db.owner("update profile_pins set locked_until = now() - interval '1 second' where profile_id=$1", [op]);
+    for (let i = 0; i < 4; i++) expect((await verify(op, "1111")).reason).toBe("wrong_pin");
+    expect((await verify(op, "1111")).reason).toBe("locked_admin");
+    expect((await verify(op, "4821")).reason).toBe("locked_admin");
+    await expectDbError(db.as(sup, "select unlock_profile_pin($1)", [op]), "FORBIDDEN");
+    await db.as(admin, "select unlock_profile_pin($1)", [op]);
+    expect((await verify(op, "4821")).ok).toBe(true);
+    const logs = await db.owner<{ action: string }>("select action from production_audit_logs where entity_type='profile_pin' and entity_id=$1 order by id", [op]);
+    expect(logs.map((l) => l.action)).toEqual(["pin_set", "pin_locked", "pin_locked_admin", "pin_unlocked"]);
+  });
+  it("lists operators and supervisors for the login screen, proprietor last, with machines", async () => {
+    const roster = await db.service<{ display_name: string; role: string; has_pin: boolean; machines: string[] }>("select * from login_roster()");
+    expect(roster.map((r) => r.display_name)).toEqual(["Neeraj", "Saroj", "Vishnu"]);
+    expect(roster.find((r) => r.display_name === "Saroj")).toMatchObject({ has_pin: true, machines: ["VIM2"] });
+    await db.as(admin, "update profiles set show_on_login = false where id = $1", [op2]);
+    expect((await db.service("select * from login_roster()")).length).toBe(2);
+    expect((await verify(op2, "1234")).reason).toBe("unavailable");
+  });
+  it("stores photos through admin-only functions and serves them to the server", async () => {
+    const data = "A".repeat(200);
+    await expectDbError(db.as(sup, "select set_profile_photo($1,'image/jpeg',$2)", [op, data]), "FORBIDDEN");
+    await db.as(admin, "select set_profile_photo($1,'image/jpeg',$2)", [op, data]);
+    const [p] = await db.service<{ content_type: string; data_base64: string }>("select * from get_profile_photo($1)", [op]);
+    expect(p).toMatchObject({ content_type: "image/jpeg", data_base64: data });
+    expect((await db.as(sup, "select * from profile_photo_versions()")).length).toBe(1);
+    expect(await db.as(cust, "select * from profile_photo_versions()")).toHaveLength(0);
+    await expectDbError(db.as(admin, "select set_profile_photo($1,'text/html',$2)", [op, data]), "content_type");
+  });
+});
